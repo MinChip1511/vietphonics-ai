@@ -1,0 +1,26 @@
+# dependencies and build output
+node_modules/
+frontend/dist/
+backend/venv/
+__pycache__/
+*.pyc
+
+# local data (never commit databases, uploads or secrets)
+backend/*.db
+backend/*.db-*
+backend/*.db.bak*
+backend/uploads/
+.env
+.env.*
+!.env.example
+*.log
+
+# tooling
+.DS_Store
+.claude/
+.superpowers/
+scripts/*.png
+scripts/screens/
+
+# client documents (kept locally, not in the repository)
+*.docx

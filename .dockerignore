@@ -1,0 +1,8 @@
+**
+!backend/app
+!backend/seed_assets
+!backend/requirements.txt
+!backend/requirements-torch.txt
+!vocab.json
+!papl_nccf_vietmdd.pt
+**/__pycache__

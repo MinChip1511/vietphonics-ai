@@ -1,0 +1,133 @@
+@import "tailwindcss";
+
+@theme {
+  --color-vp-blue: #1978DC;
+  --color-vp-sky: #DDF5FF;
+  --color-vp-ink: #0D3577;
+  --color-vp-line: #C4C7C7;
+  --color-vp-border: #E4E4E7;
+  --color-vp-muted: #6B7280;
+  --color-vp-canvas: #F0F1F8;
+  --color-vp-pill: #EEEEEE;
+  --shadow-vp-drop: 0 1.5px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-vp-card: 0 4px 8px 0 rgb(30 27 75 / 0.03);
+  --font-heading: "Baloo 2", "Nunito", system-ui, sans-serif;
+  --font-vp: "Baloo 2", "Be Vietnam Pro", system-ui, sans-serif;
+}
+
+@layer base {
+  body {
+    font-family: 'Nunito', 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
+    color: #1e293b;
+    background-color: #f8fafc;
+    overflow-x: hidden;
+    line-height: 1.5;
+  }
+  
+  /* Baloo 2 is bubbly, rounded, friendly for kids with native Vietnamese diacritics */
+  h1, h2, h3, h4, h5, h6, .font-heading, .font-kid {
+    font-family: 'Baloo 2', 'Nunito', system-ui, sans-serif;
+    line-height: 1.25;
+    letter-spacing: -0.01em;
+  }
+}
+
+.font-baloo {
+  font-family: 'Baloo 2', 'Nunito', system-ui, sans-serif;
+}
+
+.font-nunito {
+  font-family: 'Nunito', 'Be Vietnam Pro', system-ui, sans-serif;
+}
+
+.font-vietnam {
+  font-family: 'Be Vietnam Pro', 'Nunito', system-ui, sans-serif;
+}
+
+/* Custom Delightful Micro-animations & Styles */
+@keyframes pulse-ring {
+  0% { transform: scale(0.95); opacity: 0.8; }
+  50% { transform: scale(1.15); opacity: 0.3; }
+  100% { transform: scale(1.3); opacity: 0; }
+}
+
+@keyframes float-gentle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes wave-bar {
+  0%, 100% { height: 20%; }
+  50% { height: 95%; }
+}
+
+.animate-pulse-ring {
+  animation: pulse-ring 2s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+}
+
+.animate-float {
+  animation: float-gentle 3.5s ease-in-out infinite;
+}
+
+/* Glassmorphism cards */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02);
+}
+
+.glass-panel-dark {
+  background: rgba(15, 23, 42, 0.88);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* Kid Button 3D pop effect */
+.btn-kid-primary {
+  transition: all 0.15s ease;
+  box-shadow: 0 4px 0px 0px #d97706, 0 8px 16px -4px rgba(245, 158, 11, 0.4);
+}
+
+.btn-kid-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0px 0px #d97706, 0 12px 20px -4px rgba(245, 158, 11, 0.5);
+}
+
+.btn-kid-primary:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0px 0px #d97706, 0 4px 8px -2px rgba(245, 158, 11, 0.3);
+}
+
+.btn-kid-success {
+  transition: all 0.15s ease;
+  box-shadow: 0 4px 0px 0px #059669, 0 8px 16px -4px rgba(16, 185, 129, 0.4);
+}
+
+.btn-kid-success:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0px 0px #059669, 0 12px 20px -4px rgba(16, 185, 129, 0.5);
+}
+
+.btn-kid-success:active {
+  transform: translateY(2px);
+  box-shadow: 0 2px 0px 0px #059669, 0 4px 8px -2px rgba(16, 185, 129, 0.3);
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f5f9;
+}
+::-webkit-scrollbar-thumb {
+  background: #cbd5e1;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #94a3b8;
+}

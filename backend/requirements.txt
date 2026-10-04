@@ -1,0 +1,13 @@
+# Versions tested together (see scripts/run_checks.sh). torch/torchaudio are in requirements-torch.txt
+# because the Docker image installs the smaller CPU-only wheels from the PyTorch index.
+fastapi==0.141.1
+starlette==1.6.0
+uvicorn==0.52.4
+python-multipart==0.0.32
+pydantic==2.13.5
+numpy==2.4.6
+scipy==1.17.1
+soundfile==0.14.0
+transformers==5.17.0
+tokenizers==0.23.2
+safetensors==0.8.0

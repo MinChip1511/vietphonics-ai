@@ -1,0 +1,30 @@
+# Render Blueprint: the API (FastAPI + PyTorch). The frontend goes to Vercel (frontend/vercel.json).
+# Needs a paid instance for the persistent disk (SQLite database + uploaded images). Measured on CPU the
+# model peaks at ~430 MB, so `starter` (512 MB) is very tight; `standard` (2 GB) is the safe choice.
+services:
+  - type: web
+    name: vietphonics-api
+    runtime: docker
+    dockerfilePath: ./backend/Dockerfile
+    dockerContext: .
+    plan: standard
+    region: singapore
+    healthCheckPath: /api/health
+    autoDeploy: true
+    disk:
+      name: vietphonics-data
+      mountPath: /var/data
+      sizeGB: 2
+    envVars:
+      - key: VIETPHONICS_ENV
+        value: production
+      - key: VIETPHONICS_DB
+        value: /var/data/vietphonics.db
+      - key: VIETPHONICS_UPLOADS
+        value: /var/data/uploads
+      - key: VIETPHONICS_ADMIN_EMAIL
+        sync: false   # asked for when the blueprint is created
+      - key: VIETPHONICS_ADMIN_PASSWORD
+        sync: false
+      - key: VIETPHONICS_CORS
+        value: ""     # only needed if the browser calls this API directly; the Vercel /api rewrite does not

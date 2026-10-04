@@ -1,0 +1,54 @@
+# CLAUDE.md
+
+This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+
+See also [AGENTS.md](AGENTS.md) (style, commit/PR conventions) and [README.md](README.md) (Vietnamese; product overview and 11-step demo script).
+
+## What this is
+
+VietPhonics AI: a Vietnamese pronunciation-practice web app for children aged 4–7. A child records a word, the backend aligns predicted phonemes against the canonical phonemes, and the UI shows a score plus per-letter/per-phoneme feedback (the "ELSA"-style highlights). The model is PAPL-NCCF, trained on VietMDD.
+
+## Commands
+
+```bash
+./start_vietphonics.sh                      # backend :8000 + Vite :5173 (Ctrl+C stops both)
+
+# Backend (run from repo root, since imports are `backend.app.*` and asset paths are repo-root relative)
+backend/venv/bin/uvicorn backend.app.main:app --host 127.0.0.1 --port 8000
+backend/venv/bin/pip install -r backend/requirements.txt
+
+# Frontend
+cd frontend && npm run dev | build | lint | preview      # lint = oxlint
+
+scripts/run_checks.sh                       # pyflakes + all Python tests + frontend lint/build + vercel.json/render.yaml (no model, no browser)
+node scripts/smoke_ui.js                    # browser smoke test of every screen (both servers running; VP_URL for a deployed site)
+backend/venv/bin/python scripts/test_alignment.py   # phoneme alignment unit tests (plain asserts)
+backend/venv/bin/python scripts/test_verification.py   # transcript check / phone confidence unit tests
+backend/venv/bin/python scripts/test_audio_quality.py   # silence / background-noise gate (synthetic signals)
+backend/venv/bin/python scripts/test_api.py   # accounts, family isolation, admin API, shared content, points (throwaway DB, no model)
+backend/venv/bin/python scripts/test_production.py   # production mode: no demo accounts/OTP, admin from env, docs off, CORS, 503 without model
+backend/venv/bin/python scripts/test_scoring_integration.py   # real model + macOS `say` voices: known false-accepts must be capped (heavy, run on demand)
+```
+
+There is no unit-test framework: the Python tests are plain-assert scripts, and `scripts/smoke_ui.js` is the only browser test. Deployment (Vercel frontend + Render Docker backend) is described in `docs/DEPLOY.md`; settings come from environment variables read in `backend/app/config.py`. 
+## Architecture
+
+**Request flow:** browser records via MediaRecorder → `frontend/src/services/audioResampler.js` converts to 16 kHz mono WAV → `POST /api/analyze-audio` (multipart: `audio`, `canonical` phoneme string like `"s a _1"`, `target_word`, `engine_mode`) → JSON `{status, data}` with `score`, `elsa_rows`, `letter_highlights`, `errors`, `feedback` → rendered by `views/AIResultModal.jsx` / `components/ElsaWordHighlight.jsx`.
+
+**Scoring (backend/app/main.py):** at startup `lifespan` runs `init_db()` then `try_init_model()`. `analyze_audio_neural` needs `vocab.json` and `papl_nccf_vietmdd.pt` at the repo root, plus a Hugging Face wav2vec2 (`nguyenvulebinh/wav2vec2-base-vietnamese-250h`) downloaded on first load. It combines wav2vec2 features, 81-dim Kaldi-style acoustic features and NCCF pitch (`features.py`) → `PAPL_NCCF` (`model.py`) → CTC greedy decode. There is no simulated engine: if the model is not loaded or inference throws, `/api/analyze-audio` answers 503 and the UI asks the child to try again. Before any model runs, `audio_quality.py` rejects silence and loud background noise; a speech-to-text transcript that is a different word/sentence (`verification.is_off_target`) is also not scored. These cases return `scored: false` with `result_type` `no_speech | noisy | off_target` and a child-facing `message`; scored results carry an `attempt_id`. `/api/record-practice` takes `{child_id, attempt_id, lesson_id}` and reads the score the server stored for that attempt (the client cannot send its own score); stars are awarded only from `kids.PASS_SCORE`. A word with a wrong tone/phone can never score in the "good" band (`alignment.SCORE_CAP_*`). Child-facing names and hints for every phone live in `phone_hints.py` (no IPA in the UI).
+
+**Second opinions (`verification.py`):** PAPL-NCCF takes the canonical phones as input and "repairs" near-misses toward them (xi đạp / even English "she dap" scored 100 for target xe đạp). After alignment, `analyze_audio_neural` therefore adds (1) a speech-to-text check using the wav2vec2 `lm_head` (mismatch with the target word caps the score at `ASR_MISMATCH_CAP`; s/x are folded because that model cannot tell them apart) and (2) per-phone confidence by CTC forced alignment (below `UNSURE_CONFIDENCE` a correct phone becomes `UNSURE`: amber, 60% credit). The thresholds were set with synthetic voices only; each request logs `transcript`/`min_conf` to the backend console for tuning on real speech.
+
+**Alignment (`alignment.py`, the largest backend module):** Needleman-Wunsch between canonical and predicted phoneme lists with phone-similarity costs (`substitution_cost`: near pairs like S~s cost less than a gap, tone-vs-non-tone and vowel-vs-consonant are never paired, they become missing + extra; tune `_NEAR_GROUPS` here), then maps pairs to per-phoneme rows and per-letter highlights of the Vietnamese word (syllable parsing, tone handling). Scoring and Vietnamese feedback text live here too.
+
+**Input rules:** names, phone numbers and passwords are validated by `frontend/src/services/validators.js` (phone = exactly 10 digits starting with 0, one password rule, name filter). The name filter has a Python twin, `backend/app/name_filter.py`, used by `POST /api/profiles` (422 on blocked names, age must be 4–7) and by `GET /api/profiles`, which hides profiles with blocked names; keep the two word lists in sync. `frontend/src/constants.js` holds the single hotline / mascot name. The server re-validates all of it. Do not print demo credentials or unverified compliance claims (COPPA, AES…) in the UI.
+
+**Data and accounts:** SQLite at `backend/vietphonics.db` (override with `VIETPHONICS_DB`; uploads in `backend/uploads`, override `VIETPHONICS_UPLOADS`). `database.py` owns the schema and light migrations; `seed.py` inserts reference data (lessons from `lessons_data.py`, plans, coupons, rewards, settings) only when a table is empty, plus demo accounts when `VIETPHONICS_ENV` is not `production` (in production the admin comes from `VIETPHONICS_ADMIN_EMAIL`/`VIETPHONICS_ADMIN_PASSWORD`, else a random password is printed once). Modules by domain: `accounts.py` (sign-up/in, OTP, password, admin account ops; scrypt hashes, bearer session tokens in `security.py`, 5 failed logins lock for 15 min), `kids.py` (children are owned by `parent_id`; every route is owner-scoped; streak, accuracy, progress, strengths are *derived* from `practice_history`, never stored), `catalog.py` (lessons and rewards: the admin edits what children see), `commerce.py` (plans, coupons, orders; prices are computed server-side; payment is simulated), `routers/` (`auth`, `profiles`, `content`, `admin`). `/api/admin/*` needs `role: admin`. Lessons live only in the database (no frontend mirror); a lesson is visible to children when `status = published`. Points are one number, `children.stars`, spent by redeeming rewards.
+
+**Frontend:** no router. `App.jsx` holds all top-level state and a `navigate(view)` that switches `currentView`. Views are grouped by role: kid (`views/*.jsx`, practice flow in `views/practice/`), parent (`views/parent/`, plus `ParentDashboardView`/`SubscriptionView`), admin (`views/admin/`), and auth (`views/auth/`). `components/shell/navConfig.js` is the single source for which view belongs to which role, its sidebar item and TopBar title; every view listed there renders inside `AppShell` (Sidebar + TopBar), everything else (landing, login, signup, forgot) is full-page with `PublicTopBar`. Kid and parent views require a signed-in parent account and admin views a signed-in `role: "admin"` account; `navigate()` otherwise sends the user to login with a notice and returns them to the requested view afterwards, and an account with a temporary password is held on the change-password screen. `services/apiClient.js` is the only code that talks to `/api` (adds the bearer token, maps errors to messages; Vite dev server proxies `/api` → `127.0.0.1:8000`); `services/apiService.js` has the learning-screen calls; `services/store.jsx` (`StoreProvider`/`useStore`) holds the signed-in user, the user's children, the lesson catalogue, the price list and the admin console data (`admin.data`, `admin.request(path, opts)` = write then reload). There is no offline/fake fallback: when the backend is unreachable screens show the error.
+
+**Dev logins (seeded only outside production, never printed in the UI):** parent `phuhuynh@vietphonics.vn` / `123456` (or phone `0912345678` + demo OTP, default `123456` in development; no SMS is sent. In production OTP sign-in and password reset are off unless `VIETPHONICS_DEMO_OTP` is set), admin `admin@vietphonics.vn` / `admin123`. Parents created by an admin get a random temporary password shown once and must change it at first sign-in.
+
+**Design system:** built from the Figma file `WgQeJ47WTfgnzpsXBMsLtF`. Colors/fonts are Tailwind v4 `@theme` tokens in `index.css` (`vp-blue`, `vp-sky`, `vp-ink`, `vp-canvas`, …; font Baloo 2). Shared primitives live in `components/ui/index.jsx` (Card, Button, Badge, PageHeader, Tabs, Toggle, Modal, …); use them and the `vp-*` tokens rather than raw colors. Figma node IDs are noted in a comment at the top of each view. The implementation plan and screen→node mapping is `docs/superpowers/plans/2026-09-30-figma-redesign.md`. Keep the backend and frontend lesson data in sync when editing lessons.
+
+**Root artifacts:** `.pt` checkpoints, `vocab.json`, `papl_training_history.csv` and `PAPL_NCCF_VietMDD_Colab.ipynb` (training notebook) support the model; `Giáo án tổng thể…md` and the `.docx` brief are product/curriculum docs (Vietnamese).
