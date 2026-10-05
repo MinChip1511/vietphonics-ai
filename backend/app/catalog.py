@@ -2,12 +2,13 @@
 import json
 import re
 import uuid
-from datetime import datetime, timezone
 
-from .database import db
+from bson import Binary
+
+from .config import VOCAB_PATH
+from .database import clean, clean_all, col, now_iso
 from .lessons_data import CATEGORIES
 
-from .config import UPLOAD_DIR, VOCAB_PATH
 LESSON_STATUSES = ("draft", "published", "archived")
 REWARD_KINDS = ("Mascot Outfit", "Visual Sticker", "Huy hiệu")
 _ID = re.compile(r"^[a-z0-9][a-z0-9-]{1,40}$")
@@ -17,14 +18,10 @@ class CatalogError(ValueError):
     """Bad input for the catalog; the message is safe to show to the admin."""
 
 
-def _now():
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
 # ---- lessons ------------------------------------------------------------------------------------
 
 def _lesson_from_row(row):
-    lesson = json.loads(row["data"])
+    lesson = dict(row["data"])
     lesson["id"] = row["id"]
     # Every word needs a stable id (the admin edits words by id); seeded lessons were written without.
     for position, word in enumerate(lesson.get("words", []), start=1):
@@ -35,23 +32,16 @@ def _lesson_from_row(row):
 
 
 def list_lessons(published_only=True, category=None):
-    sql = "SELECT * FROM lessons"
-    clauses, params = [], []
-    if published_only:
-        clauses.append("status = 'published'")
-    if clauses:
-        sql += " WHERE " + " AND ".join(clauses)
-    sql += " ORDER BY sort_order, id"
-    with db() as conn:
-        lessons = [_lesson_from_row(r) for r in conn.execute(sql, params)]
+    query = {"status": "published"} if published_only else {}
+    rows = clean_all(col("lessons").find(query).sort([("sort_order", 1), ("_id", 1)]))
+    lessons = [_lesson_from_row(r) for r in rows]
     if category and category != "all":
         lessons = [lesson for lesson in lessons if lesson.get("category") == category]
     return lessons
 
 
 def get_lesson(lesson_id, published_only=True):
-    with db() as conn:
-        row = conn.execute("SELECT * FROM lessons WHERE id = ?", (lesson_id,)).fetchone()
+    row = clean(col("lessons").find_one({"_id": lesson_id}))
     if not row or (published_only and row["status"] != "published"):
         return None
     return _lesson_from_row(row)
@@ -141,24 +131,19 @@ def save_lesson(payload, lesson_id=None, known_phones=None):
 
     new_id = lesson_id or f"lesson-{uuid.uuid4().hex[:8]}"
     data.pop("id", None)
-    with db() as conn:
-        if existing:
-            conn.execute(
-                "UPDATE lessons SET status = ?, data = ?, updated_at = ? WHERE id = ?",
-                (status, json.dumps(data, ensure_ascii=False), _now(), new_id),
-            )
-        else:
-            order = conn.execute("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM lessons").fetchone()[0]
-            conn.execute(
-                "INSERT INTO lessons (id, status, sort_order, data, updated_at) VALUES (?, ?, ?, ?, ?)",
-                (new_id, status, order, json.dumps(data, ensure_ascii=False), _now()),
-            )
+    if existing:
+        col("lessons").update_one({"_id": new_id}, {"$set": {"status": status, "data": data, "updated_at": now_iso()}})
+    else:
+        last = col("lessons").find_one(sort=[("sort_order", -1)])
+        col("lessons").insert_one({
+            "_id": new_id, "status": status, "sort_order": (last["sort_order"] if last else 0) + 1,
+            "data": data, "updated_at": now_iso(),
+        })
     return get_lesson(new_id, published_only=False)
 
 
 def delete_lesson(lesson_id):
-    with db() as conn:
-        conn.execute("DELETE FROM lessons WHERE id = ?", (lesson_id,))
+    col("lessons").delete_one({"_id": lesson_id})
 
 
 # ---- rewards ------------------------------------------------------------------------------------
@@ -171,14 +156,12 @@ def _reward_dict(row):
 
 
 def list_rewards(active_only=True):
-    sql = "SELECT * FROM rewards" + (" WHERE active = 1" if active_only else "") + " ORDER BY sort_order, created_at"
-    with db() as conn:
-        return [_reward_dict(r) for r in conn.execute(sql)]
+    query = {"active": True} if active_only else {}
+    return [_reward_dict(r) for r in clean_all(col("rewards").find(query).sort([("sort_order", 1), ("created_at", 1)]))]
 
 
 def get_reward(reward_id):
-    with db() as conn:
-        row = conn.execute("SELECT * FROM rewards WHERE id = ?", (reward_id,)).fetchone()
+    row = clean(col("rewards").find_one({"_id": reward_id}))
     return _reward_dict(row) if row else None
 
 
@@ -201,25 +184,29 @@ def save_reward(payload, reward_id=None):
     active = bool(payload.get("active", (existing or {}).get("active", True)))
     icon = payload.get("icon", (existing or {}).get("icon")) or "🎁"
 
-    with db() as conn:
-        if existing:
-            conn.execute(
-                "UPDATE rewards SET title = ?, kind = ?, cost = ?, icon = ?, active = ? WHERE id = ?",
-                (title, kind, cost, icon, 1 if active else 0, reward_id),
-            )
-            new_id = reward_id
-        else:
-            new_id = f"rw-{uuid.uuid4().hex[:8]}"
-            order = conn.execute("SELECT COALESCE(MAX(sort_order), 0) + 1 FROM rewards").fetchone()[0]
-            conn.execute(
-                "INSERT INTO rewards (id, title, kind, cost, icon, active, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-                (new_id, title, kind, cost, icon, 1 if active else 0, order, _now()),
-            )
+    if existing:
+        col("rewards").update_one({"_id": reward_id}, {"$set": {"title": title, "kind": kind, "cost": cost, "icon": icon, "active": active}})
+        return get_reward(reward_id)
+    new_id = f"rw-{uuid.uuid4().hex[:8]}"
+    last = col("rewards").find_one(sort=[("sort_order", -1)])
+    col("rewards").insert_one({
+        "_id": new_id, "title": title, "kind": kind, "cost": cost, "icon": icon, "image": None, "active": active,
+        "sort_order": (last["sort_order"] if last else 0) + 1, "created_at": now_iso(),
+    })
     return get_reward(new_id)
 
 
+# Reward images live in the database (collection "files"), so a deployment needs no persistent disk.
 IMAGE_TYPES = {"image/jpeg": ".jpg", "image/png": ".png", "image/webp": ".webp"}
 MAX_IMAGE_BYTES = 1_500_000
+_MAGIC = {b"\xff\xd8\xff": "image/jpeg", b"\x89PNG\r\n\x1a\n": "image/png"}
+
+
+def _looks_like(content_type, data):
+    """The bytes must really be the declared image type (a header alone proves nothing)."""
+    if content_type == "image/webp":
+        return data[:4] == b"RIFF" and data[8:12] == b"WEBP"
+    return any(data.startswith(magic) and kind == content_type for magic, kind in _MAGIC.items())
 
 
 def save_reward_image(reward_id, content_type, data: bytes):
@@ -227,23 +214,31 @@ def save_reward_image(reward_id, content_type, data: bytes):
         raise CatalogError("Chỉ nhận ảnh JPG, PNG hoặc WebP.")
     if len(data) > MAX_IMAGE_BYTES:
         raise CatalogError("Ảnh tối đa 1.5MB.")
-    if not get_reward(reward_id):
+    if not _looks_like(content_type, data):
+        raise CatalogError("Tệp không phải là ảnh hợp lệ.")
+    reward = get_reward(reward_id)
+    if not reward:
         raise CatalogError("Không tìm thấy phần thưởng.")
-    folder = UPLOAD_DIR / "rewards"
-    folder.mkdir(parents=True, exist_ok=True)
-    name = f"{reward_id}-{uuid.uuid4().hex[:6]}{IMAGE_TYPES[content_type]}"
-    (folder / name).write_bytes(data)
-    with db() as conn:
-        conn.execute("UPDATE rewards SET image = ? WHERE id = ?", (f"rewards/{name}", reward_id))
+    file_id = f"rewards/{reward_id}-{uuid.uuid4().hex[:6]}{IMAGE_TYPES[content_type]}"
+    col("files").insert_one({"_id": file_id, "content_type": content_type, "data": Binary(data), "created_at": now_iso()})
+    previous = col("rewards").find_one_and_update({"_id": reward_id}, {"$set": {"image": file_id}})
+    if previous and previous.get("image"):
+        col("files").delete_one({"_id": previous["image"]})
     return get_reward(reward_id)
+
+
+def get_file(file_id):
+    """(content_type, bytes) of an uploaded file, or None."""
+    doc = col("files").find_one({"_id": file_id})
+    return (doc["content_type"], bytes(doc["data"])) if doc else None
 
 
 def delete_reward(reward_id):
     """Removes a reward nobody owns; one that children already own is archived (hidden) instead."""
-    with db() as conn:
-        owned = conn.execute("SELECT COUNT(*) FROM reward_redemptions WHERE reward_id = ?", (reward_id,)).fetchone()[0]
-        if owned:
-            conn.execute("UPDATE rewards SET active = 0 WHERE id = ?", (reward_id,))
-            return "archived"
-        conn.execute("DELETE FROM rewards WHERE id = ?", (reward_id,))
-        return "deleted"
+    if col("reward_redemptions").count_documents({"reward_id": reward_id}):
+        col("rewards").update_one({"_id": reward_id}, {"$set": {"active": False}})
+        return "archived"
+    gone = col("rewards").find_one_and_delete({"_id": reward_id})
+    if gone and gone.get("image"):
+        col("files").delete_one({"_id": gone["image"]})
+    return "deleted"

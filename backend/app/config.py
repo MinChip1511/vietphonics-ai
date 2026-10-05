@@ -17,8 +17,10 @@ def _env(name, default=None):
 ENV = _env("VIETPHONICS_ENV", "development").lower()
 PRODUCTION = ENV == "production"
 
-DB_PATH = Path(_env("VIETPHONICS_DB", BACKEND_DIR / "vietphonics.db"))
-UPLOAD_DIR = Path(_env("VIETPHONICS_UPLOADS", BACKEND_DIR / "uploads"))
+# MongoDB (Atlas "mongodb+srv://..." in production). "mongomock://" is an in-memory database for tests and
+# quick local runs; it is refused in production. The default only suits a local mongod.
+MONGODB_URI = _env("MONGODB_URI", "mongodb://127.0.0.1:27017")
+MONGODB_DB = _env("MONGODB_DB", "vietphonics")
 VOCAB_PATH = Path(_env("VIETPHONICS_VOCAB", REPO_ROOT / "vocab.json"))
 MODEL_PATH = Path(_env("VIETPHONICS_MODEL", REPO_ROOT / "papl_nccf_vietmdd.pt"))
 

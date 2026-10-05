@@ -7,14 +7,11 @@ still loading, and scoring answers 503 (not a fake score) when the model is not 
 """
 import os
 import sys
-import tempfile
 from pathlib import Path
 
-TMP = tempfile.mkdtemp(prefix="vp-prod-")
 os.environ.update({
     "VIETPHONICS_ENV": "production",
-    "VIETPHONICS_DB": str(Path(TMP) / "prod.db"),
-    "VIETPHONICS_UPLOADS": str(Path(TMP) / "uploads"),
+    "MONGODB_URI": "mongomock://",  # production refuses this (see the first case); the test injects a handle instead
     "VIETPHONICS_ADMIN_EMAIL": "owner@vietphonics.example",
     "VIETPHONICS_ADMIN_PASSWORD": "Owner-Pass-12345",
     "VIETPHONICS_CORS": "https://app.vercel.example",
@@ -24,10 +21,19 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fastapi.testclient import TestClient  # noqa: E402
 
-from backend.app.database import init_db  # noqa: E402
+import mongomock  # noqa: E402
+
+from backend.app import database  # noqa: E402
 from backend.app.main import app  # noqa: E402
 
-init_db()
+try:  # production must never fall back to the in-memory database
+    database.get_db()
+    refused = False
+except RuntimeError:
+    refused = True
+assert refused, "production accepted mongomock://"
+database._database = mongomock.MongoClient()["vp_prod_test"]  # test-only handle, bypassing the guard
+database.init_db()
 client = TestClient(app)  # no lifespan: the model is not loaded
 CASES = []
 

@@ -3,13 +3,15 @@
 Nothing here is a stored guess: streak, accuracy, completed lessons, strengths and weaknesses are all
 computed from `practice_history` (see build_profile), so every screen shows the same numbers.
 """
-import json
 import uuid
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
 
+from pymongo import ReturnDocument
+from pymongo.errors import DuplicateKeyError
+
 from .catalog import list_lessons
-from .database import db
+from .database import clean, clean_all, col, iso, now_iso, utc_now
 from .validation import ValidationError, clean_name
 
 PASS_SCORE = 70            # a word counts as learned from this score on
@@ -107,10 +109,7 @@ def _weekly(rows):
 # ---- profile --------------------------------------------------------------------------------------
 
 def _settings(row):
-    try:
-        stored = json.loads(row["settings_json"] or "{}")
-    except ValueError:
-        stored = {}
+    stored = row.get("settings") or {}
     return {**DEFAULT_SETTINGS, **{k: v for k, v in stored.items() if k in DEFAULT_SETTINGS}}
 
 
@@ -118,7 +117,7 @@ def lesson_progress(history_rows, lessons):
     """{lesson_id: {passed, total, completed, best}} from a child's history and the published lessons."""
     best_by_word = defaultdict(int)
     for row in history_rows:
-        if row["lesson_id"]:
+        if row.get("lesson_id"):
             key = (row["lesson_id"], row["word"].strip().lower())
             best_by_word[key] = max(best_by_word[key], row["score"])
     progress = {}
@@ -136,11 +135,9 @@ def lesson_progress(history_rows, lessons):
 
 
 def build_profile(row):
-    with db() as conn:
-        history = conn.execute(
-            "SELECT lesson_id, word, score, phones_json, created_at FROM practice_history WHERE child_id = ? ORDER BY created_at, id",
-            (row["id"],),
-        ).fetchall()
+    history = list(col("practice_history").find(
+        {"child_id": row["id"]}, {"lesson_id": 1, "word": 1, "score": 1, "phones": 1, "created_at": 1}
+    ).sort([("created_at", 1), ("_id", 1)]))
     lessons = list_lessons(published_only=True)
     progress = lesson_progress(history, lessons)
 
@@ -148,7 +145,7 @@ def build_profile(row):
     groups = defaultdict(lambda: [0, 0])  # label -> [correct, total]
     by_category = defaultdict(lambda: [0, 0])  # initial / final / tone -> [correct, total]
     for h in history:
-        for token, category, ok in json.loads(h["phones_json"] or "[]"):
+        for token, category, ok in h.get("phones", []):
             for bucket in (groups[sound_group(token, category)], by_category[category]):
                 bucket[1] += 1
                 bucket[0] += 1 if ok else 0
@@ -156,11 +153,11 @@ def build_profile(row):
     needs = [label for accuracy, label in rated if accuracy < 0.75][:3]
     strong = [label for accuracy, label in reversed(rated) if accuracy >= 0.85][:2]
     if not history:  # no practice yet: use what the onboarding quiz found
-        needs = json.loads(row["initial_needs"] or "[]")
+        needs = list(row.get("initial_needs") or [])
 
     return {
         "id": row["id"],
-        "parent_id": row["parent_id"],
+        "parent_id": row.get("parent_id"),
         "name": row["name"],
         "age": row["age"],
         "avatar": row["avatar"],
@@ -186,28 +183,23 @@ def build_profile(row):
 # ---- access -----------------------------------------------------------------------------------------
 
 def _row(child_id):
-    with db() as conn:
-        return conn.execute("SELECT * FROM children WHERE id = ?", (child_id,)).fetchone()
+    return clean(col("children").find_one({"_id": child_id}))
 
 
 def get_owned_child(child_id, account):
     """The child's row when `account` owns it; 404 otherwise (so another family's ids are not even confirmed)."""
     row = _row(child_id)
-    if not row or row["parent_id"] != account["id"]:
+    if not row or row.get("parent_id") != account["id"]:
         raise KidError("Không tìm thấy hồ sơ bé", 404)
     return row
 
 
 def list_children(account_id):
-    with db() as conn:
-        rows = conn.execute("SELECT * FROM children WHERE parent_id = ? ORDER BY created_at, rowid", (account_id,)).fetchall()
-    return [build_profile(r) for r in rows]
+    return [build_profile(r) for r in clean_all(col("children").find({"parent_id": account_id}).sort("created_at", 1))]
 
 
 def all_children():
-    with db() as conn:
-        rows = conn.execute("SELECT * FROM children ORDER BY created_at, rowid").fetchall()
-    return [build_profile(r) for r in rows]
+    return [build_profile(r) for r in clean_all(col("children").find().sort("created_at", 1))]
 
 
 def get_profile(child_id, account):
@@ -229,44 +221,40 @@ def _checked_settings(patch, base):
     return settings
 
 
-def create_child(account, *, name, age, avatar, initial_needs=None, settings=None, child_id=None):
+def create_child(account, *, name, age, avatar, initial_needs=None, settings=None, child_id=None, stars=0):
     name = clean_name(name, "tên của bé")
     age = _check_age(age)
     settings = _checked_settings(settings, DEFAULT_SETTINGS)
-    avatar = str(avatar or "mascot:ca-voi")[:40]
     child_id = child_id or f"child-{uuid.uuid4().hex[:10]}"
-    with db() as conn:
-        conn.execute(
-            "INSERT INTO children (id, name, age, avatar, stars, parent_id, initial_needs, settings_json) VALUES (?, ?, ?, ?, 0, ?, ?, ?)",
-            (child_id, name, age, avatar, account["id"], json.dumps(list(initial_needs or [])[:3], ensure_ascii=False), json.dumps(settings)),
-        )
+    col("children").insert_one({
+        "_id": child_id, "name": name, "age": age, "avatar": str(avatar or "mascot:ca-voi")[:40],
+        "stars": stars, "parent_id": account["id"], "initial_needs": list(initial_needs or [])[:3],
+        "settings": settings, "created_at": now_iso(),
+    })
     return build_profile(_row(child_id))
 
 
 def update_child(child_id, account, patch):
     row = get_owned_child(child_id, account)
-    name, age, avatar, settings = row["name"], row["age"], row["avatar"], _settings(row)
+    changes = {}
     if "name" in patch:
-        name = clean_name(patch["name"], "tên của bé")
+        changes["name"] = clean_name(patch["name"], "tên của bé")
     if "age" in patch:
-        age = _check_age(patch["age"])
+        changes["age"] = _check_age(patch["age"])
     if "avatar" in patch:
-        avatar = str(patch["avatar"])[:40]
-    settings = _checked_settings(patch.get("settings"), settings)
-    with db() as conn:
-        conn.execute(
-            "UPDATE children SET name = ?, age = ?, avatar = ?, settings_json = ? WHERE id = ?",
-            (name, age, avatar, json.dumps(settings), child_id),
-        )
+        changes["avatar"] = str(patch["avatar"])[:40]
+    if patch.get("settings") is not None:
+        changes["settings"] = _checked_settings(patch["settings"], _settings(row))
+    if changes:
+        col("children").update_one({"_id": child_id}, {"$set": changes})
     return build_profile(_row(child_id))
 
 
 def delete_child(child_id):
     """Removes the profile and everything recorded for it (history, owned rewards)."""
-    with db() as conn:
-        conn.execute("DELETE FROM reward_redemptions WHERE child_id = ?", (child_id,))
-        conn.execute("DELETE FROM practice_history WHERE child_id = ?", (child_id,))
-        conn.execute("DELETE FROM children WHERE id = ?", (child_id,))
+    col("reward_redemptions").delete_many({"child_id": child_id})
+    col("practice_history").delete_many({"child_id": child_id})
+    col("children").delete_one({"_id": child_id})
 
 
 # ---- practice -------------------------------------------------------------------------------------------
@@ -282,79 +270,63 @@ def record_attempt(analysis, account_id):
         {k: r.get(k) for k in ("canonical_name", "canonical_token", "observed_token", "status", "category")}
         for r in analysis.get("errors", [])
     ]
-    with db() as conn:
-        conn.execute(
-            """INSERT INTO analysis_attempts (id, account_id, word, canonical, score, phones_json, errors_json, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (attempt_id, account_id, analysis.get("target_word", ""), " ".join(analysis.get("canonical", [])),
-             int(analysis.get("score", 0)), json.dumps(phones), json.dumps(errors, ensure_ascii=False),
-             datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")),
-        )
-        conn.execute(
-            "DELETE FROM analysis_attempts WHERE created_at < ?",
-            ((datetime.now(timezone.utc) - timedelta(days=2)).strftime("%Y-%m-%dT%H:%M:%SZ"),),
-        )
+    col("analysis_attempts").insert_one({
+        "_id": attempt_id, "account_id": account_id, "word": analysis.get("target_word", ""),
+        "canonical": " ".join(analysis.get("canonical", [])), "score": int(analysis.get("score", 0)),
+        "phones": phones, "errors": errors, "consumed": False, "created_at": now_iso(),
+    })
+    col("analysis_attempts").delete_many({"created_at": {"$lt": iso(utc_now() - timedelta(days=2))}})
     return attempt_id
 
 
 def record_practice(account, child_id, attempt_id, lesson_id):
     """Saves a scored attempt for the child (once) and awards points when it reached the pass mark."""
     get_owned_child(child_id, account)  # 404 unless the child belongs to this account
-    with db() as conn:
-        attempt = conn.execute(
-            "SELECT * FROM analysis_attempts WHERE id = ? AND account_id = ?", (attempt_id, account["id"])
-        ).fetchone()
-        if not attempt:
-            raise KidError("Không tìm thấy kết quả chấm điểm này", 404)
-        if attempt["consumed"]:
-            raise KidError("Kết quả này đã được lưu rồi", 409)
-        score = attempt["score"]
-        passed = score >= PASS_SCORE
-        conn.execute("UPDATE analysis_attempts SET consumed = 1 WHERE id = ?", (attempt_id,))
-        conn.execute(
-            """INSERT INTO practice_history (child_id, word, canonical, score, is_correct, errors_json, lesson_id, phones_json)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?)""",
-            (child_id, attempt["word"], attempt["canonical"], score, 1 if passed else 0,
-             attempt["errors_json"], lesson_id, attempt["phones_json"]),
-        )
-        awarded = STARS_PER_PASS if passed else 0
-        if awarded:
-            conn.execute("UPDATE children SET stars = stars + ? WHERE id = ?", (awarded, child_id))
+    attempt = col("analysis_attempts").find_one({"_id": attempt_id, "account_id": account["id"]})
+    if not attempt:
+        raise KidError("Không tìm thấy kết quả chấm điểm này", 404)
+    # The atomic flip decides who records it when two requests carry the same attempt.
+    claimed = col("analysis_attempts").find_one_and_update(
+        {"_id": attempt_id, "consumed": False}, {"$set": {"consumed": True}}, return_document=ReturnDocument.AFTER
+    )
+    if not claimed:
+        raise KidError("Kết quả này đã được lưu rồi", 409)
+    score = claimed["score"]
+    passed = score >= PASS_SCORE
+    col("practice_history").insert_one({
+        "child_id": child_id, "word": claimed["word"], "canonical": claimed["canonical"], "score": score,
+        "is_correct": passed, "errors": claimed["errors"], "lesson_id": lesson_id,
+        "phones": claimed["phones"], "created_at": now_iso(),
+    })
+    awarded = STARS_PER_PASS if passed else 0
+    if awarded:
+        col("children").update_one({"_id": child_id}, {"$inc": {"stars": awarded}})
     return build_profile(_row(child_id)), awarded
 
 
 def practice_history(child_id, account, limit=15):
     get_owned_child(child_id, account)
-    with db() as conn:
-        rows = conn.execute(
-            """SELECT id, child_id, word, canonical, score, is_correct, errors_json, lesson_id, created_at
-               FROM practice_history WHERE child_id = ? ORDER BY created_at DESC, id DESC LIMIT ?""",
-            (child_id, max(1, min(int(limit), 500))),
-        ).fetchall()
-    history = []
-    for r in rows:
-        d = dict(r)
-        d["errors"] = json.loads(d.pop("errors_json") or "[]")
-        history.append(d)
-    return history
+    cursor = col("practice_history").find({"child_id": child_id}).sort([("created_at", -1), ("_id", -1)]).limit(max(1, min(int(limit), 500)))
+    return [
+        {"id": str(h["_id"]), "child_id": h["child_id"], "word": h["word"], "canonical": h["canonical"],
+         "score": h["score"], "is_correct": 1 if h["is_correct"] else 0, "errors": h.get("errors", []),
+         "lesson_id": h.get("lesson_id"), "created_at": h["created_at"]}
+        for h in cursor
+    ]
 
 
 # ---- rewards of a child -----------------------------------------------------------------------------------
 
 def child_rewards(child_id, account):
     """Reward catalogue as this child sees it: balance, owned ids and (family) leaderboard."""
-    from .catalog import list_rewards
+    from .catalog import get_reward, list_rewards
 
     row = get_owned_child(child_id, account)
-    with db() as conn:
-        owned = [r["reward_id"] for r in conn.execute("SELECT reward_id FROM reward_redemptions WHERE child_id = ?", (child_id,))]
-        owned_rows = conn.execute("SELECT * FROM rewards WHERE id IN (%s)" % ",".join("?" * len(owned)), owned).fetchall() if owned else []
+    owned = [r["reward_id"] for r in col("reward_redemptions").find({"child_id": child_id})]
     catalogue = {r["id"]: r for r in list_rewards(active_only=True)}
-    for r in owned_rows:  # an archived reward stays visible to the children who already own it
-        if r["id"] not in catalogue:
-            from .catalog import get_reward
-
-            catalogue[r["id"]] = get_reward(r["id"])
+    for reward_id in owned:  # an archived reward stays visible to the children who already own it
+        if reward_id not in catalogue and get_reward(reward_id):
+            catalogue[reward_id] = get_reward(reward_id)
     board = sorted(list_children(account["id"]), key=lambda c: -c["stars"])
     return {
         "balance": row["stars"],
@@ -374,32 +346,15 @@ def redeem_reward(child_id, account, reward_id):
     reward = get_reward(reward_id)
     if not reward or not reward["active"]:
         raise KidError("Phần thưởng này hiện không còn", 404)
-    conn = db_connect_immediate()
+    # The unique (child, reward) index stops a second redemption; the conditional decrement stops overspending.
     try:
-        owned = conn.execute("SELECT 1 FROM reward_redemptions WHERE child_id = ? AND reward_id = ?", (child_id, reward_id)).fetchone()
-        if owned:
-            raise KidError("Con đã có phần thưởng này rồi", 409)
-        stars = conn.execute("SELECT stars FROM children WHERE id = ?", (child_id,)).fetchone()["stars"]
-        if stars < reward["cost"]:
-            raise KidError("Con chưa đủ điểm để đổi phần thưởng này", 400)
-        conn.execute("UPDATE children SET stars = stars - ? WHERE id = ?", (reward["cost"], child_id))
-        conn.execute(
-            "INSERT INTO reward_redemptions (child_id, reward_id, cost, created_at) VALUES (?, ?, ?, ?)",
-            (child_id, reward_id, reward["cost"], datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")),
-        )
-        conn.commit()
-    except Exception:
-        conn.rollback()
-        raise
-    finally:
-        conn.close()
+        col("reward_redemptions").insert_one({"child_id": child_id, "reward_id": reward_id, "cost": reward["cost"], "created_at": now_iso()})
+    except DuplicateKeyError:
+        raise KidError("Con đã có phần thưởng này rồi", 409)
+    spent = col("children").find_one_and_update(
+        {"_id": child_id, "stars": {"$gte": reward["cost"]}}, {"$inc": {"stars": -reward["cost"]}}
+    )
+    if not spent:
+        col("reward_redemptions").delete_one({"child_id": child_id, "reward_id": reward_id})
+        raise KidError("Con chưa đủ điểm để đổi phần thưởng này", 400)
     return child_rewards(child_id, account)
-
-
-def db_connect_immediate():
-    """Connection with a write lock taken up front, so two redemptions cannot both pass the balance check."""
-    from .database import connect
-
-    conn = connect()
-    conn.execute("BEGIN IMMEDIATE")
-    return conn

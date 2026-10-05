@@ -6,24 +6,16 @@ SHA-256 digest is stored, so a leaked database does not leak usable tokens.
 import hashlib
 import hmac
 import secrets
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from typing import Optional
 
 from fastapi import Depends, Header, HTTPException
 
-from .database import db
+from .database import clean, col, now_iso, utc_now
 
 _SCRYPT = {"n": 2 ** 14, "r": 8, "p": 1}
 SESSION_DAYS_REMEMBERED = 30
 SESSION_HOURS_DEFAULT = 12
-
-
-def _now():
-    return datetime.now(timezone.utc)
-
-
-def _iso(moment):
-    return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
 def hash_password(password: str) -> str:
@@ -54,23 +46,21 @@ def hash_code(code: str) -> str:
 def create_session(account_id: str, remember: bool = True) -> str:
     token = secrets.token_urlsafe(32)
     lifetime = timedelta(days=SESSION_DAYS_REMEMBERED) if remember else timedelta(hours=SESSION_HOURS_DEFAULT)
-    with db() as conn:
-        conn.execute(
-            "INSERT INTO sessions (token_hash, account_id, created_at, expires_at) VALUES (?, ?, ?, ?)",
-            (hash_token(token), account_id, _iso(_now()), _iso(_now() + lifetime)),
-        )
-        conn.execute("DELETE FROM sessions WHERE expires_at < ?", (_iso(_now()),))
+    col("sessions").insert_one({
+        "_id": hash_token(token),
+        "account_id": account_id,
+        "created_at": now_iso(),
+        "expires_at": utc_now() + lifetime,  # TTL index removes the document after this moment
+    })
     return token
 
 
 def revoke_session(token: str) -> None:
-    with db() as conn:
-        conn.execute("DELETE FROM sessions WHERE token_hash = ?", (hash_token(token),))
+    col("sessions").delete_one({"_id": hash_token(token)})
 
 
 def revoke_account_sessions(account_id: str) -> None:
-    with db() as conn:
-        conn.execute("DELETE FROM sessions WHERE account_id = ?", (account_id,))
+    col("sessions").delete_many({"account_id": account_id})
 
 
 def _bearer(authorization: Optional[str]) -> Optional[str]:
@@ -83,13 +73,10 @@ def _bearer(authorization: Optional[str]) -> Optional[str]:
 def account_for_token(token: Optional[str]) -> Optional[dict]:
     if not token:
         return None
-    with db() as conn:
-        row = conn.execute(
-            """SELECT a.* FROM sessions s JOIN accounts a ON a.id = s.account_id
-               WHERE s.token_hash = ? AND s.expires_at > ?""",
-            (hash_token(token), _iso(_now())),
-        ).fetchone()
-    return dict(row) if row else None
+    session = col("sessions").find_one({"_id": hash_token(token), "expires_at": {"$gt": utc_now()}})
+    if not session:
+        return None
+    return clean(col("accounts").find_one({"_id": session["account_id"]}))
 
 
 def current_account(authorization: Optional[str] = Header(None)) -> dict:

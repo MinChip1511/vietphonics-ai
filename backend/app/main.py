@@ -4,7 +4,6 @@ import threading
 from contextlib import asynccontextmanager
 from fastapi import Depends, FastAPI, File, UploadFile, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
-from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 
 from .alignment import (
@@ -18,7 +17,7 @@ from .alignment import (
 from .accounts import AuthError
 from .audio_quality import analyze_signal
 from . import config
-from .catalog import CatalogError, UPLOAD_DIR
+from .catalog import CatalogError
 from .commerce import CommerceError
 from .database import init_db
 from .features import decode_audio_bytes, acoustic_81, nccf_pitch, resize_time
@@ -292,10 +291,6 @@ app.include_router(auth_router.router)
 app.include_router(profiles_router.router)
 app.include_router(content_router.router)
 app.include_router(admin_router.router)
-
-UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
-app.mount("/api/uploads", StaticFiles(directory=str(UPLOAD_DIR)), name="uploads")
-
 
 @app.get("/")
 @app.get("/api/health")

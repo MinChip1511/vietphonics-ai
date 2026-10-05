@@ -2,10 +2,12 @@
 import secrets
 import string
 import uuid
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
+
+from pymongo.errors import DuplicateKeyError
 
 from .config import DEMO_OTP
-from .database import db
+from .database import clean, clean_all, col, iso, now_iso, utc_now
 from .security import (
     create_session, hash_code, hash_password, revoke_account_sessions, verify_password,
 )
@@ -26,18 +28,9 @@ class AuthError(Exception):
         self.status = status
 
 
-def _now():
-    return datetime.now(timezone.utc)
-
-
-def _iso(moment):
-    return moment.strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
 def public_account(row) -> dict:
     """The account as the client may see it (never the hash)."""
-    with db() as conn:
-        kids = [r["id"] for r in conn.execute("SELECT id FROM children WHERE parent_id = ? ORDER BY created_at", (row["id"],))]
+    kids = [c["_id"] for c in col("children").find({"parent_id": row["id"]}, {"_id": 1}).sort("created_at", 1)]
     return {
         "id": row["id"],
         "role": row["role"],
@@ -54,18 +47,15 @@ def public_account(row) -> dict:
 
 
 def get_account(account_id):
-    with db() as conn:
-        return conn.execute("SELECT * FROM accounts WHERE id = ?", (account_id,)).fetchone()
+    return clean(col("accounts").find_one({"_id": account_id}))
 
 
 def find_by_email(email):
-    with db() as conn:
-        return conn.execute("SELECT * FROM accounts WHERE email = ? COLLATE NOCASE", (str(email).strip(),)).fetchone()
+    return clean(col("accounts").find_one({"email": str(email).strip().lower()}))
 
 
 def find_by_phone(phone):
-    with db() as conn:
-        return conn.execute("SELECT * FROM accounts WHERE phone = ?", (normalize_phone(phone),)).fetchone()
+    return clean(col("accounts").find_one({"phone": normalize_phone(phone)}))
 
 
 def create_account(*, name, email, phone, password, role="parent", plan="free", must_change_password=False, is_demo=False):
@@ -80,14 +70,15 @@ def create_account(*, name, email, phone, password, role="parent", plan="free", 
     if find_by_phone(phone):
         raise AuthError("Số điện thoại này đã được đăng ký.", 409)
     account_id = f"acc-{uuid.uuid4().hex[:12]}"
-    with db() as conn:
-        conn.execute(
-            """INSERT INTO accounts (id, role, name, email, phone, password_hash, plan, status,
-                                     must_change_password, is_demo, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, 'active', ?, ?, ?)""",
-            (account_id, role, name, email, phone, hash_password(password), plan,
-             1 if must_change_password else 0, 1 if is_demo else 0, _iso(_now())),
-        )
+    try:
+        col("accounts").insert_one({
+            "_id": account_id, "role": role, "name": name, "email": email, "phone": phone,
+            "password_hash": hash_password(password), "plan": plan, "status": "active",
+            "must_change_password": bool(must_change_password), "failed_logins": 0, "locked_until": None,
+            "is_demo": bool(is_demo), "created_at": now_iso(),
+        })
+    except DuplicateKeyError:  # two sign-ups raced past the checks above; the unique indexes decide
+        raise AuthError("Email hoặc số điện thoại này đã được đăng ký.", 409)
     return get_account(account_id)
 
 
@@ -104,16 +95,15 @@ def login_with_password(email, password, remember=True):
     generic = AuthError("Email hoặc mật khẩu chưa đúng.")
     if not row:
         raise generic
-    if row["locked_until"] and row["locked_until"] > _iso(_now()):
+    if row["locked_until"] and row["locked_until"] > now_iso():
         raise AuthError("Đăng nhập sai quá nhiều lần. Vui lòng thử lại sau ít phút.", 429)
     if not verify_password(password or "", row["password_hash"]):
         failures = row["failed_logins"] + 1
-        locked_until = _iso(_now() + timedelta(minutes=LOCKOUT_MINUTES)) if failures >= MAX_FAILED_LOGINS else None
-        with db() as conn:
-            conn.execute(
-                "UPDATE accounts SET failed_logins = ?, locked_until = ? WHERE id = ?",
-                (0 if locked_until else failures, locked_until, row["id"]),
-            )
+        locked_until = iso(utc_now() + timedelta(minutes=LOCKOUT_MINUTES)) if failures >= MAX_FAILED_LOGINS else None
+        col("accounts").update_one(
+            {"_id": row["id"]},
+            {"$set": {"failed_logins": 0 if locked_until else failures, "locked_until": locked_until}},
+        )
         raise generic
     return _open_session(row, remember)
 
@@ -121,8 +111,7 @@ def login_with_password(email, password, remember=True):
 def _open_session(row, remember):
     if row["status"] == "locked":
         raise AuthError("Tài khoản đang bị khóa. Vui lòng liên hệ quản trị viên để được hỗ trợ.", 403)
-    with db() as conn:
-        conn.execute("UPDATE accounts SET failed_logins = 0, locked_until = NULL WHERE id = ?", (row["id"],))
+    col("accounts").update_one({"_id": row["id"]}, {"$set": {"failed_logins": 0, "locked_until": None}})
     return create_session(row["id"], remember), get_account(row["id"])
 
 
@@ -136,26 +125,25 @@ def _require_otp_enabled():
 def send_otp(phone):
     _require_otp_enabled()
     phone = clean_phone(phone)
-    with db() as conn:
-        conn.execute(
-            "INSERT OR REPLACE INTO otp_codes (phone, code_hash, expires_at, attempts) VALUES (?, ?, ?, 0)",
-            (phone, hash_code(DEMO_OTP), _iso(_now() + timedelta(minutes=OTP_MINUTES))),
-        )
+    col("otp_codes").replace_one(
+        {"_id": phone},
+        {"_id": phone, "code_hash": hash_code(DEMO_OTP), "expires_at": iso(utc_now() + timedelta(minutes=OTP_MINUTES)), "attempts": 0},
+        upsert=True,
+    )
     return {"registered": find_by_phone(phone) is not None, "expiresInSeconds": OTP_MINUTES * 60, "demo": True}
 
 
 def check_otp(phone, code):
     _require_otp_enabled()
     phone = normalize_phone(phone)
-    with db() as conn:
-        row = conn.execute("SELECT * FROM otp_codes WHERE phone = ?", (phone,)).fetchone()
-        if not row or row["expires_at"] < _iso(_now()) or row["attempts"] >= OTP_MAX_ATTEMPTS:
-            raise AuthError("Mã OTP không đúng hoặc đã hết hạn.", 400)
-        if hash_code(str(code or "")) != row["code_hash"]:
-            conn.execute("UPDATE otp_codes SET attempts = attempts + 1 WHERE phone = ?", (phone,))
-            conn.commit()
-            raise AuthError("Mã OTP không đúng hoặc đã hết hạn.", 400)
-        conn.execute("DELETE FROM otp_codes WHERE phone = ?", (phone,))
+    row = col("otp_codes").find_one({"_id": phone})
+    bad = AuthError("Mã OTP không đúng hoặc đã hết hạn.", 400)
+    if not row or row["expires_at"] < now_iso() or row["attempts"] >= OTP_MAX_ATTEMPTS:
+        raise bad
+    if hash_code(str(code or "")) != row["code_hash"]:
+        col("otp_codes").update_one({"_id": phone}, {"$inc": {"attempts": 1}})
+        raise bad
+    col("otp_codes").delete_one({"_id": phone})
 
 
 def login_with_otp(phone, code, remember=True):
@@ -179,11 +167,11 @@ def reset_password(identifier, code, new_password):
 
 
 def set_password(account_id, new_password, must_change=False):
-    with db() as conn:
-        conn.execute(
-            "UPDATE accounts SET password_hash = ?, must_change_password = ?, failed_logins = 0, locked_until = NULL WHERE id = ?",
-            (hash_password(new_password), 1 if must_change else 0, account_id),
-        )
+    col("accounts").update_one(
+        {"_id": account_id},
+        {"$set": {"password_hash": hash_password(new_password), "must_change_password": bool(must_change),
+                  "failed_logins": 0, "locked_until": None}},
+    )
     revoke_account_sessions(account_id)
 
 
@@ -200,23 +188,19 @@ def change_password(account, current_password, new_password):
 # ---- admin operations ----------------------------------------------------------------------------
 
 def list_accounts():
-    with db() as conn:
-        rows = conn.execute("SELECT * FROM accounts ORDER BY created_at DESC, rowid DESC").fetchall()
-    return [public_account(r) for r in rows]
+    return [public_account(r) for r in clean_all(col("accounts").find().sort("created_at", -1))]
 
 
 def set_status(account_id, status):
     if status not in ("active", "locked"):
         raise ValidationError("Trạng thái không hợp lệ.")
-    with db() as conn:
-        conn.execute("UPDATE accounts SET status = ? WHERE id = ?", (status, account_id))
+    col("accounts").update_one({"_id": account_id}, {"$set": {"status": status}})
     if status == "locked":
         revoke_account_sessions(account_id)
 
 
 def set_plan(account_id, plan):
-    with db() as conn:
-        conn.execute("UPDATE accounts SET plan = ? WHERE id = ?", (plan, account_id))
+    col("accounts").update_one({"_id": account_id}, {"$set": {"plan": plan}})
 
 
 def admin_create_parent(*, name, email, phone, plan="free"):
@@ -237,12 +221,9 @@ def admin_reset_password(account_id):
 
 def delete_account(account_id):
     """Deletes a parent account together with its children and their practice data."""
-    from .kids import delete_child  # local import: kids builds on accounts' tables
+    from .kids import delete_child  # local import: kids builds on accounts' collections
 
-    with db() as conn:
-        kid_ids = [r["id"] for r in conn.execute("SELECT id FROM children WHERE parent_id = ?", (account_id,))]
-    for kid_id in kid_ids:
-        delete_child(kid_id)
-    with db() as conn:
-        conn.execute("DELETE FROM sessions WHERE account_id = ?", (account_id,))
-        conn.execute("DELETE FROM accounts WHERE id = ?", (account_id,))
+    for kid in col("children").find({"parent_id": account_id}, {"_id": 1}):
+        delete_child(kid["_id"])
+    revoke_account_sessions(account_id)
+    col("accounts").delete_one({"_id": account_id})

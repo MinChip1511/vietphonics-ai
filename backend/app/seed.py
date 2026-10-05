@@ -5,18 +5,17 @@ edited. Demo accounts and their practice history are flagged `is_demo` and are n
 VIETPHONICS_ENV=production; the admin account there comes from VIETPHONICS_ADMIN_EMAIL/PASSWORD
 (or a random password printed once).
 """
-import json
 import logging
 import secrets
-import shutil
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
+from bson import Binary
+
 from .accounts import create_account, find_by_email, temporary_password
 from .alignment import _phone_category
-from .catalog import UPLOAD_DIR
 from .config import ADMIN_EMAIL, ADMIN_PASSWORD, PRODUCTION
-from .database import db
+from .database import col, iso, now_iso
 from .lessons_data import LESSONS
 from .phone_hints import is_nucleus, is_tone
 
@@ -50,49 +49,46 @@ SETTINGS = {
 log = logging.getLogger("vietphonics.seed")
 
 
-def _now():
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
 def seed_reference():
-    with db() as conn:
-        if conn.execute("SELECT COUNT(*) FROM lessons").fetchone()[0] == 0:
-            for order, lesson in enumerate(LESSONS, start=1):
-                data = {k: v for k, v in lesson.items() if k != "id"}
-                conn.execute(
-                    "INSERT INTO lessons (id, status, sort_order, data, updated_at) VALUES (?, 'published', ?, ?, ?)",
-                    (lesson["id"], order, json.dumps(data, ensure_ascii=False), _now()),
+    if col("lessons").count_documents({}) == 0:
+        col("lessons").insert_many([
+            {"_id": lesson["id"], "status": "published", "sort_order": order,
+             "data": {k: v for k, v in lesson.items() if k != "id"}, "updated_at": now_iso()}
+            for order, lesson in enumerate(LESSONS, start=1)
+        ])
+    if col("plans").count_documents({}) == 0:
+        col("plans").insert_many([
+            {"_id": pid, "name": name, "monthly": monthly, "yearly": yearly, "active": True, "perks": perks, "sort_order": order}
+            for order, (pid, name, monthly, yearly, perks) in enumerate(PLANS, start=1)
+        ])
+    if col("coupons").count_documents({}) == 0:
+        col("coupons").insert_many([
+            {"_id": cid, "campaign": campaign, "type": kind, "value": value, "scope": scope, "expires": expires, "status": status}
+            for cid, campaign, kind, value, scope, expires, status in COUPONS
+        ])
+    if col("rewards").count_documents({}) == 0:
+        for order, (rid, title, kind, cost, icon, image, active) in enumerate(REWARDS, start=1):
+            file_id = None
+            if (SEED_ASSETS / image).exists():  # the picture is stored in the database, next to the reward
+                file_id = f"rewards/{image}"
+                col("files").replace_one(
+                    {"_id": file_id},
+                    {"_id": file_id, "content_type": "image/jpeg", "data": Binary((SEED_ASSETS / image).read_bytes()), "created_at": now_iso()},
+                    upsert=True,
                 )
-        if conn.execute("SELECT COUNT(*) FROM plans").fetchone()[0] == 0:
-            for order, (pid, name, monthly, yearly, perks) in enumerate(PLANS, start=1):
-                conn.execute(
-                    "INSERT INTO plans (id, name, monthly, yearly, active, perks_json, sort_order) VALUES (?, ?, ?, ?, 1, ?, ?)",
-                    (pid, name, monthly, yearly, json.dumps(perks, ensure_ascii=False), order),
-                )
-        if conn.execute("SELECT COUNT(*) FROM coupons").fetchone()[0] == 0:
-            conn.executemany("INSERT INTO coupons (id, campaign, type, value, scope, expires, status) VALUES (?, ?, ?, ?, ?, ?, ?)", COUPONS)
-        if conn.execute("SELECT COUNT(*) FROM rewards").fetchone()[0] == 0:
-            folder = UPLOAD_DIR / "rewards"
-            folder.mkdir(parents=True, exist_ok=True)
-            for order, (rid, title, kind, cost, icon, image, active) in enumerate(REWARDS, start=1):
-                stored = None
-                if (SEED_ASSETS / image).exists():
-                    shutil.copy(SEED_ASSETS / image, folder / image)
-                    stored = f"rewards/{image}"
-                conn.execute(
-                    "INSERT INTO rewards (id, title, kind, cost, icon, image, active, sort_order, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                    (rid, title, kind, cost, icon, stored, active, order, _now()),
-                )
-        for key, value in SETTINGS.items():
-            conn.execute("INSERT OR IGNORE INTO settings (key, value_json) VALUES (?, ?)", (key, json.dumps(value, ensure_ascii=False)))
+            col("rewards").insert_one({
+                "_id": rid, "title": title, "kind": kind, "cost": cost, "icon": icon, "image": file_id,
+                "active": bool(active), "sort_order": order, "created_at": now_iso(),
+            })
+    for key, value in SETTINGS.items():
+        col("settings").update_one({"_id": key}, {"$setOnInsert": {"value": value}}, upsert=True)
 
 
 # ---- admin ---------------------------------------------------------------------------------------------
 
 def seed_admin():
-    with db() as conn:
-        if conn.execute("SELECT COUNT(*) FROM accounts WHERE role = 'admin'").fetchone()[0]:
-            return
+    if col("accounts").count_documents({"role": "admin"}):
+        return
     if PRODUCTION:
         email = ADMIN_EMAIL
         password = ADMIN_PASSWORD or temporary_password() + secrets.token_hex(2)
@@ -135,84 +131,78 @@ def _practice_lessons(child_id, lessons, completed, base_score, streak_days, wea
 
     The latest `streak_days` days all have practice (a streak); older practice is spread over earlier
     weeks with gaps. Phones in `weak` are marked wrong on every other word (a demo weakness)."""
-    now = datetime.now(timezone.utc)
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
     rows = []
     for lesson in lessons[:completed]:
         rows += [(lesson["id"], w) for w in lesson["words"]]
     if completed < len(lessons) and completed > 0:
         rows += [(lessons[completed]["id"], w) for w in lessons[completed]["words"][:2]]
-    with db() as conn:
-        for i, (lesson_id, word) in enumerate(rows):
-            back = len(rows) - 1 - i  # 0 = most recent attempt
-            offset = back if back < streak_days else streak_days + 2 + ((back - streak_days) // 2) * 3
-            score = max(PASS, min(99, base_score + (i * 7) % 11 - 3))
-            day = now - timedelta(days=offset, hours=i % 5)
-            conn.execute(
-                """INSERT INTO practice_history (child_id, word, canonical, score, is_correct, errors_json, lesson_id, phones_json, created_at)
-                   VALUES (?, ?, ?, ?, 1, '[]', ?, ?, ?)""",
-                (child_id, word["word"], word["canonical"], score, lesson_id,
-                 json.dumps(_phones(word["canonical"], weak, wrong=i % 2 == 0)), day.strftime("%Y-%m-%d %H:%M:%S")),
-            )
+    docs = []
+    for i, (lesson_id, word) in enumerate(rows):
+        back = len(rows) - 1 - i  # 0 = most recent attempt
+        offset = back if back < streak_days else streak_days + 2 + ((back - streak_days) // 2) * 3
+        docs.append({
+            "child_id": child_id, "word": word["word"], "canonical": word["canonical"],
+            "score": max(PASS, min(99, base_score + (i * 7) % 11 - 3)), "is_correct": True, "errors": [],
+            "lesson_id": lesson_id, "phones": _phones(word["canonical"], weak, wrong=i % 2 == 0),
+            "created_at": iso(now - timedelta(days=offset, hours=i % 5, seconds=i)),
+        })
+    if docs:
+        col("practice_history").insert_many(docs)
 
 
 PASS = 70
 
 
+def _demo_child(parent, child_id, name, age, avatar, stars):
+    col("children").replace_one(
+        {"_id": child_id},
+        {"_id": child_id, "name": name, "age": age, "avatar": avatar, "stars": stars, "parent_id": parent["id"],
+         "initial_needs": [], "settings": {}, "created_at": now_iso()},
+        upsert=True,
+    )
+    col("practice_history").delete_many({"child_id": child_id})
+
+
 def seed_demo():
     if PRODUCTION or find_by_email(DEMO_PARENT["email"]):
         return
-    lessons = [json.loads(r["data"]) | {"id": r["id"]} for r in _published_rows()]
+    lessons = [{**d["data"], "id": d["_id"]} for d in col("lessons").find({"status": "published"}).sort("sort_order", 1)]
     parent = create_account(**DEMO_PARENT, is_demo=True)
 
-    with db() as conn:
-        # Adopt the two demo children older databases already contain (their points are kept).
-        for child_id, name, age, avatar, stars in (("child-minh", "Bé Minh", 7, "mascot:khung-long", 240), ("child-an", "Bé An", 6, "mascot:tho", 95)):
-            exists = conn.execute("SELECT 1 FROM children WHERE id = ?", (child_id,)).fetchone()
-            if exists:
-                conn.execute("UPDATE children SET parent_id = ?, name = ?, age = ?, avatar = ?, stars = ? WHERE id = ?",
-                             (parent["id"], name, age, avatar, stars, child_id))
-            else:
-                conn.execute("INSERT INTO children (id, name, age, avatar, stars, parent_id) VALUES (?, ?, ?, ?, ?, ?)",
-                             (child_id, name, age, avatar, stars, parent["id"]))
-            # Their history is rebuilt below so that it matches the lesson list.
-            conn.execute("DELETE FROM practice_history WHERE child_id = ?", (child_id,))
+    _demo_child(parent, "child-minh", "Bé Minh", 7, "mascot:khung-long", 240)
+    _demo_child(parent, "child-an", "Bé An", 6, "mascot:tho", 95)
     _practice_lessons("child-minh", lessons, 8, 84, 5, weak=("S", "s", "N", "ts_", "tS"))
     _practice_lessons("child-an", lessons, 3, 74, 2, weak=("_3", "_4", "l", "n"))
 
     for name, email, phone, plan, locked, kids in DEMO_FAMILIES:
         account = create_account(name=name, email=email, phone=phone, password="123456", plan=plan, is_demo=True)
         if locked:
-            with db() as conn:
-                conn.execute("UPDATE accounts SET status = 'locked' WHERE id = ?", (account["id"],))
+            col("accounts").update_one({"_id": account["id"]}, {"$set": {"status": "locked"}})
         for kid_name, age, avatar, stars, completed, score in kids:
             child_id = f"child-demo-{secrets.token_hex(4)}"
-            with db() as conn:
-                conn.execute("INSERT INTO children (id, name, age, avatar, stars, parent_id) VALUES (?, ?, ?, ?, ?, ?)",
-                             (child_id, kid_name, age, avatar, stars, account["id"]))
+            _demo_child(account, child_id, kid_name, age, avatar, stars)
             _practice_lessons(child_id, lessons, completed, score, 1, weak=("S", "s") if score < 80 else ())
     seed_demo_orders(parent)
 
 
 def seed_demo_orders(parent):
     orders = [
-        ("VP-9082", None, "Lê Hoàng Nam", "hoangnam.parent@gmail.com", "0988123456", "Gói Premium 1 Năm", 699000, "Cổng VNPay", "paid", "2026-09-29 09:12"),
-        ("VP-9083", None, "Nguyễn Minh Triết", "triet.nguyen@gmail.com", "0912345679", "Gói Family 1 Năm", 1083000, "Cổng MoMo", "paid", "2026-09-28 14:32"),
-        ("VP-9084", None, "Phạm Minh Thư", "minhthu@gmail.com", "0977111222", "Gói Basic 1 Tháng", 49000, "QR ngân hàng", "pending", "2026-09-28 10:05"),
-        ("VP-9085", None, "Đặng Anh Tuấn", "tuan.dang@gmail.com", "0966555444", "Gói Premium 1 Năm", 699000, "Cổng VNPay", "failed", "2026-09-27 21:40"),
-        ("VP-9086", None, "Trần Thị Lan", "lan.tran@gmail.com", "0955333222", "Gói Premium 1 Tháng", 79000, "Cổng MoMo", "expired", "2026-09-26 08:30"),
-        ("VP-9087", None, "Vũ Hoàng Yến", "yen.vu@gmail.com", "0933444555", "Gói Family 1 Năm", 1083000, "QR ngân hàng", "refunded", "2026-09-25 16:18"),
-        ("VP-9081", parent["id"], parent["name"], parent["email"], parent["phone"], "Gói Premium 1 Năm", 699000, "MoMo", "paid", "2026-01-12 10:00"),
+        ("VP-9082", None, "Lê Hoàng Nam", "hoangnam.parent@gmail.com", "0988123456", "Gói Premium 1 Năm", 699000, "Cổng VNPay", "paid", "2026-09-29T09:12:00.000Z"),
+        ("VP-9083", None, "Nguyễn Minh Triết", "triet.nguyen@gmail.com", "0912345679", "Gói Family 1 Năm", 1083000, "Cổng MoMo", "paid", "2026-09-28T14:32:00.000Z"),
+        ("VP-9084", None, "Phạm Minh Thư", "minhthu@gmail.com", "0977111222", "Gói Basic 1 Tháng", 49000, "QR ngân hàng", "pending", "2026-09-28T10:05:00.000Z"),
+        ("VP-9085", None, "Đặng Anh Tuấn", "tuan.dang@gmail.com", "0966555444", "Gói Premium 1 Năm", 699000, "Cổng VNPay", "failed", "2026-09-27T21:40:00.000Z"),
+        ("VP-9086", None, "Trần Thị Lan", "lan.tran@gmail.com", "0955333222", "Gói Premium 1 Tháng", 79000, "Cổng MoMo", "expired", "2026-09-26T08:30:00.000Z"),
+        ("VP-9087", None, "Vũ Hoàng Yến", "yen.vu@gmail.com", "0933444555", "Gói Family 1 Năm", 1083000, "QR ngân hàng", "refunded", "2026-09-25T16:18:00.000Z"),
+        ("VP-9081", parent["id"], parent["name"], parent["email"], parent["phone"], "Gói Premium 1 Năm", 699000, "MoMo", "paid", "2026-01-12T10:00:00.000Z"),
     ]
-    with db() as conn:
-        conn.executemany(
-            "INSERT OR IGNORE INTO orders (id, account_id, customer, email, phone, plan, amount, method, status, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-            orders,
+    for oid, account_id, customer, email, phone, plan, amount, method, status, created in orders:
+        col("orders").update_one(
+            {"_id": oid},
+            {"$setOnInsert": {"account_id": account_id, "customer": customer, "email": email, "phone": phone, "plan": plan,
+                              "amount": amount, "method": method, "status": status, "created_at": created}},
+            upsert=True,
         )
-
-
-def _published_rows():
-    with db() as conn:
-        return conn.execute("SELECT * FROM lessons WHERE status = 'published' ORDER BY sort_order").fetchall()
 
 
 def seed_all():

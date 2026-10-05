@@ -3,7 +3,7 @@
 ## Project Structure & Module Organization
 
 - `frontend/src/` contains the React/Vite application: `views/` for screens, `components/` for reusable UI, `services/` for API/audio integrations, and `data/` for UI labels and plan presentation text (lessons, prices and rewards come from the backend).
-- `backend/app/` contains the FastAPI API, SQLite access, accounts and admin routes, audio features, alignment logic, and PAPL-NCCF model code.
+- `backend/app/` contains the FastAPI API, MongoDB access, accounts and admin routes, audio features, alignment logic, and PAPL-NCCF model code.
 - `scripts/` contains the Python tests, `run_checks.sh` and the Playwright smoke test `smoke_ui.js`. Deployment files: `render.yaml`, `backend/Dockerfile`, `frontend/vercel.json`, `docs/DEPLOY.md`. Root-level `.pt`, `vocab.json`, and training artifacts support the AI backend.
 - Keep generated folders and local environments out of commits: `frontend/node_modules/`, `frontend/dist/`, `backend/venv/`, `__pycache__/`, and local databases.
 

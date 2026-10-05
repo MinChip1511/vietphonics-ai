@@ -2,6 +2,7 @@
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException
+from fastapi.responses import Response
 from pydantic import BaseModel
 
 from .. import catalog, commerce
@@ -60,3 +61,13 @@ def create_order(body: OrderBody, account: dict = Depends(current_account)):
 @router.post("/orders/{order_id}/confirm-demo")
 def confirm_demo(order_id: str, account: dict = Depends(current_account)):
     return commerce.confirm_demo_payment(order_id, account)
+
+
+@router.get("/uploads/{file_id:path}")
+def uploaded_file(file_id: str):
+    """Reward pictures are stored in the database; file ids are unique per upload, so they cache forever."""
+    found = catalog.get_file(file_id)
+    if not found:
+        raise HTTPException(status_code=404, detail="Không tìm thấy tệp")
+    content_type, data = found
+    return Response(data, media_type=content_type, headers={"Cache-Control": "public, max-age=31536000, immutable"})

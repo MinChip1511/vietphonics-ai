@@ -1,13 +1,12 @@
 """Admin console API. Every route requires a signed-in account with role "admin"."""
-import json
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from typing import Optional
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
 from .. import accounts, catalog, commerce, kids
-from ..database import db
+from ..database import col, now_iso, utc_now
 from ..security import admin_account
 from ..validation import ValidationError
 
@@ -16,13 +15,8 @@ router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(ad
 MAX_RETENTION_DAYS = 365
 
 
-def _now():
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
 def audit(actor, action):
-    with db() as conn:
-        conn.execute("INSERT INTO audit_logs (actor, action, created_at) VALUES (?, ?, ?)", (actor["name"], action, _now()))
+    col("audit_logs").insert_one({"actor": actor["name"], "action": action, "created_at": now_iso()})
 
 
 def _parent(account_id):
@@ -51,13 +45,12 @@ class StatusBody(BaseModel):
 # ---- overview ---------------------------------------------------------------------------------------
 
 def _settings():
-    with db() as conn:
-        return {r["key"]: json.loads(r["value_json"]) for r in conn.execute("SELECT key, value_json FROM settings")}
+    return {d["_id"]: d["value"] for d in col("settings").find()}
 
 
 def _audit_rows(limit=30):
-    with db() as conn:
-        return [dict(r) for r in conn.execute("SELECT id, actor, action, created_at FROM audit_logs ORDER BY id DESC LIMIT ?", (limit,))]
+    return [{"id": str(d["_id"]), "actor": d["actor"], "action": d["action"], "created_at": d["created_at"]}
+            for d in col("audit_logs").find().sort("_id", -1).limit(limit)]
 
 
 def _accounts_with_children():
@@ -74,45 +67,57 @@ def _accounts_with_children():
     return result, [c for c in children if not c["parent_id"]]
 
 
+def _day_total(field_filter, day):
+    pipeline = [
+        {"$match": {**field_filter, "created_at": {"$regex": f"^{day}"}}},
+        {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
+    ]
+    result = list(col("orders").aggregate(pipeline))
+    return result[0]["total"] if result else 0
+
+
 def _metrics():
-    now = datetime.now(timezone.utc)
-    with db() as conn:
-        one = lambda sql, *a: conn.execute(sql, a).fetchone()[0]  # noqa: E731
-        paid = one("SELECT COALESCE(SUM(amount), 0) FROM orders WHERE status = 'paid'")
-        by_plan = [dict(r) for r in conn.execute(
-            "SELECT plan, COUNT(*) AS orders, SUM(amount) AS amount FROM orders WHERE status = 'paid' GROUP BY plan ORDER BY amount DESC")]
-        recent = [dict(r) for r in conn.execute(
-            """SELECT h.score, h.word, h.created_at, c.name AS child FROM practice_history h
-               JOIN children c ON c.id = h.child_id ORDER BY h.created_at DESC, h.id DESC LIMIT 6""")]
-        daily = []
-        for back in range(6, -1, -1):
-            day = (now - timedelta(days=back)).strftime("%Y-%m-%d")
-            amount = one("SELECT COALESCE(SUM(amount), 0) FROM orders WHERE status = 'paid' AND substr(created_at, 1, 10) = ?", day)
-            daily.append({"day": day, "amount": amount})
-        attempts_daily = []
-        for back in range(6, -1, -1):
-            day = (now - timedelta(days=back)).strftime("%Y-%m-%d")
-            attempts_daily.append({"day": day, "count": one("SELECT COUNT(*) FROM practice_history WHERE substr(created_at, 1, 10) = ?", day)})
-        sounds = {"initial": [0, 0], "final": [0, 0], "tone": [0, 0]}
-        for (phones_json,) in conn.execute("SELECT phones_json FROM practice_history"):
-            for _token, category, ok in json.loads(phones_json or "[]"):
-                if category in sounds:
-                    sounds[category][1] += 1
-                    sounds[category][0] += 1 if ok else 0
-        return {
-            "attemptsDaily": attempts_daily,
-            "soundAccuracy": {k: (round(100 * c / t) if t else None) for k, (c, t) in sounds.items()},
-            "parents": one("SELECT COUNT(*) FROM accounts WHERE role = 'parent'"),
-            "children": one("SELECT COUNT(*) FROM children WHERE parent_id IS NOT NULL"),
-            "attempts": one("SELECT COUNT(*) FROM practice_history"),
-            "paidOrders": one("SELECT COUNT(*) FROM orders WHERE status = 'paid'"),
-            "pendingOrders": one("SELECT COUNT(*) FROM orders WHERE status = 'pending'"),
-            "revenue": paid,
-            "paidParents": one("SELECT COUNT(*) FROM accounts WHERE role = 'parent' AND plan != 'free'"),
-            "revenueByPlan": by_plan,
-            "revenueDaily": daily,
-            "recentSubmissions": recent,
-        }
+    now = utc_now()
+    paid = list(col("orders").aggregate([{"$match": {"status": "paid"}}, {"$group": {"_id": None, "total": {"$sum": "$amount"}}}]))
+    by_plan = [
+        {"plan": d["_id"], "orders": d["orders"], "amount": d["amount"]}
+        for d in col("orders").aggregate([
+            {"$match": {"status": "paid"}},
+            {"$group": {"_id": "$plan", "orders": {"$sum": 1}, "amount": {"$sum": "$amount"}}},
+            {"$sort": {"amount": -1}},
+        ])
+    ]
+    child_names = {c["_id"]: c["name"] for c in col("children").find({}, {"name": 1})}
+    recent = [
+        {"score": h["score"], "word": h["word"], "created_at": h["created_at"], "child": child_names[h["child_id"]]}
+        for h in col("practice_history").find().sort([("created_at", -1), ("_id", -1)]).limit(30)
+        if h["child_id"] in child_names
+    ][:6]
+    revenue_daily, attempts_daily = [], []
+    for back in range(6, -1, -1):
+        day = (now - timedelta(days=back)).strftime("%Y-%m-%d")
+        revenue_daily.append({"day": day, "amount": _day_total({"status": "paid"}, day)})
+        attempts_daily.append({"day": day, "count": col("practice_history").count_documents({"created_at": {"$regex": f"^{day}"}})})
+    sounds = {"initial": [0, 0], "final": [0, 0], "tone": [0, 0]}
+    for h in col("practice_history").find({}, {"phones": 1}):
+        for _token, category, ok in h.get("phones", []):
+            if category in sounds:
+                sounds[category][1] += 1
+                sounds[category][0] += 1 if ok else 0
+    return {
+        "attemptsDaily": attempts_daily,
+        "soundAccuracy": {k: (round(100 * c / t) if t else None) for k, (c, t) in sounds.items()},
+        "parents": col("accounts").count_documents({"role": "parent"}),
+        "children": col("children").count_documents({"parent_id": {"$ne": None}}),
+        "attempts": col("practice_history").count_documents({}),
+        "paidOrders": col("orders").count_documents({"status": "paid"}),
+        "pendingOrders": col("orders").count_documents({"status": "pending"}),
+        "revenue": paid[0]["total"] if paid else 0,
+        "paidParents": col("accounts").count_documents({"role": "parent", "plan": {"$ne": "free"}}),
+        "revenueByPlan": by_plan,
+        "revenueDaily": revenue_daily,
+        "recentSubmissions": recent,
+    }
 
 
 @router.get("/bootstrap")
@@ -176,8 +181,7 @@ def delete_parent(account_id: str, admin: dict = Depends(admin_account)):
 
 @router.delete("/children/{child_id}")
 def delete_child(child_id: str, admin: dict = Depends(admin_account)):
-    with db() as conn:
-        row = conn.execute("SELECT name FROM children WHERE id = ?", (child_id,)).fetchone()
+    row = col("children").find_one({"_id": child_id}, {"name": 1})
     if not row:
         raise HTTPException(status_code=404, detail="Không tìm thấy hồ sơ bé")
     kids.delete_child(child_id)
@@ -297,8 +301,7 @@ def update_settings(body: dict, admin: dict = Depends(admin_account)):
     days = body.get("audioRetentionDays")
     if not isinstance(days, int) or isinstance(days, bool) or not 1 <= days <= MAX_RETENTION_DAYS:
         raise ValidationError(f"Thời gian lưu cần từ 1 đến {MAX_RETENTION_DAYS} ngày.")
-    with db() as conn:
-        conn.execute("INSERT OR REPLACE INTO settings (key, value_json) VALUES ('audioRetentionDays', ?)", (json.dumps(days),))
+    col("settings").update_one({"_id": "audioRetentionDays"}, {"$set": {"value": days}}, upsert=True)
     audit(admin, f"Đổi thời hạn lưu âm thanh thành {days} ngày")
     return _settings()
 

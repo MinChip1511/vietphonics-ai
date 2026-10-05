@@ -3,11 +3,12 @@
 Payment is simulated for now (no payment gateway is connected): an order is created as "pending" and a
 demo confirmation marks it paid and upgrades the account.
 """
-import json
 import re
-from datetime import date, datetime, timezone
+from datetime import date
 
-from .database import db
+from pymongo import ReturnDocument
+
+from .database import clean, clean_all, col, now_iso
 
 ORDER_STATUSES = ("paid", "pending", "failed", "expired", "refunded")
 PERIODS = ("monthly", "yearly")
@@ -23,28 +24,22 @@ class CommerceError(ValueError):
         self.status = status
 
 
-def _now():
-    return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
 # ---- plans --------------------------------------------------------------------------------------
 
 def _plan(row):
-    d = dict(row)
+    d = clean(row)
     d["active"] = bool(d["active"])
-    d["perks"] = json.loads(d.pop("perks_json") or "[]")
+    d["perks"] = d.pop("perks", [])
     return d
 
 
 def list_plans(active_only=True):
-    sql = "SELECT * FROM plans" + (" WHERE active = 1" if active_only else "") + " ORDER BY sort_order"
-    with db() as conn:
-        return [_plan(r) for r in conn.execute(sql)]
+    query = {"active": True} if active_only else {}
+    return [_plan(r) for r in col("plans").find(query).sort("sort_order", 1)]
 
 
 def get_plan(plan_id):
-    with db() as conn:
-        row = conn.execute("SELECT * FROM plans WHERE id = ?", (plan_id,)).fetchone()
+    row = col("plans").find_one({"_id": plan_id})
     return _plan(row) if row else None
 
 
@@ -63,26 +58,18 @@ def update_plan(plan_id, payload):
     if plan["id"] == "free" and (monthly or yearly):
         raise CommerceError("Gói Free luôn miễn phí.")
     active = bool(payload.get("active", plan["active"]))
-    with db() as conn:
-        conn.execute("UPDATE plans SET monthly = ?, yearly = ?, active = ? WHERE id = ?", (monthly, yearly, 1 if active else 0, plan_id))
+    col("plans").update_one({"_id": plan_id}, {"$set": {"monthly": monthly, "yearly": yearly, "active": active}})
     return get_plan(plan_id)
 
 
 # ---- coupons ------------------------------------------------------------------------------------
 
-def _coupon(row):
-    return dict(row)
-
-
 def list_coupons():
-    with db() as conn:
-        return [_coupon(r) for r in conn.execute("SELECT * FROM coupons ORDER BY rowid DESC")]
+    return clean_all(col("coupons").find().sort("_id", 1))
 
 
 def get_coupon(code):
-    with db() as conn:
-        row = conn.execute("SELECT * FROM coupons WHERE id = ?", (str(code or "").strip().upper(),)).fetchone()
-    return _coupon(row) if row else None
+    return clean(col("coupons").find_one({"_id": str(code or "").strip().upper()}))
 
 
 def save_coupon(payload, code=None):
@@ -111,23 +98,16 @@ def save_coupon(payload, code=None):
     if not campaign:
         raise CommerceError("Vui lòng nhập tên chiến dịch.")
     scope = str(payload.get("scope", (existing or {}).get("scope", ""))).strip()
-    with db() as conn:
-        if existing:
-            conn.execute(
-                "UPDATE coupons SET campaign = ?, type = ?, value = ?, scope = ?, expires = ?, status = ? WHERE id = ?",
-                (campaign, kind, value, scope, expires, status, code),
-            )
-        else:
-            conn.execute(
-                "INSERT INTO coupons (id, campaign, type, value, scope, expires, status) VALUES (?, ?, ?, ?, ?, ?, ?)",
-                (code, campaign, kind, value, scope, expires, status),
-            )
+    col("coupons").replace_one(
+        {"_id": code},
+        {"_id": code, "campaign": campaign, "type": kind, "value": value, "scope": scope, "expires": expires, "status": status},
+        upsert=True,
+    )
     return get_coupon(code)
 
 
 def delete_coupon(code):
-    with db() as conn:
-        conn.execute("DELETE FROM coupons WHERE id = ?", (str(code).upper(),))
+    col("coupons").delete_one({"_id": str(code).upper()})
 
 
 def _scope_allows(scope, plan_id, period):
@@ -168,23 +148,22 @@ def price_for(plan_id, period, coupon_code=None):
 
 # ---- orders -------------------------------------------------------------------------------------
 
-def _next_order_id(conn):
-    nums = [int(m.group(1)) for (oid,) in conn.execute("SELECT id FROM orders") if (m := re.match(r"VP-(\d+)$", oid))]
-    return f"VP-{max(nums + [9081]) + 1}"
+def _next_order_id():
+    """VP-9082, VP-9083...: an atomic counter, so two simultaneous checkouts never share a number."""
+    if not col("counters").find_one({"_id": "order"}):
+        existing = [int(m.group(1)) for o in col("orders").find({}, {"_id": 1}) if (m := re.match(r"VP-(\d+)$", o["_id"]))]
+        col("counters").update_one({"_id": "order"}, {"$setOnInsert": {"seq": max(existing + [9081])}}, upsert=True)
+    seq = col("counters").find_one_and_update({"_id": "order"}, {"$inc": {"seq": 1}}, return_document=ReturnDocument.AFTER)["seq"]
+    return f"VP-{seq}"
 
 
 def list_orders(account_id=None):
-    sql, params = "SELECT * FROM orders", ()
-    if account_id:
-        sql, params = sql + " WHERE account_id = ?", (account_id,)
-    with db() as conn:
-        return [dict(r) for r in conn.execute(sql + " ORDER BY created_at DESC, rowid DESC", params)]
+    query = {"account_id": account_id} if account_id else {}
+    return clean_all(col("orders").find(query).sort([("created_at", -1), ("_id", -1)]))
 
 
 def get_order(order_id):
-    with db() as conn:
-        row = conn.execute("SELECT * FROM orders WHERE id = ?", (order_id,)).fetchone()
-    return dict(row) if row else None
+    return clean(col("orders").find_one({"_id": order_id}))
 
 
 PAYMENT_METHODS = ("QR ngân hàng", "MoMo", "VNPay")
@@ -194,15 +173,13 @@ def create_order(account, plan_id, period, coupon_code=None, method="QR ngân h�
     plan, _, final, coupon = price_for(plan_id, period, coupon_code)
     if method not in PAYMENT_METHODS:
         raise CommerceError("Phương thức thanh toán không hợp lệ.")
-    with db() as conn:
-        order_id = _next_order_id(conn)
-        conn.execute(
-            """INSERT INTO orders (id, account_id, customer, email, phone, plan, amount, method, status, created_at)
-               VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?)""",
-            (order_id, account["id"], account["name"], account["email"], account["phone"],
-             f"Gói {plan['name']} {PERIOD_LABEL[period]}" + (f" (mã {coupon['id']})" if coupon else ""),
-             final, f"{method} (mô phỏng)", _now()),
-        )
+    order_id = _next_order_id()
+    col("orders").insert_one({
+        "_id": order_id, "account_id": account["id"], "customer": account["name"], "email": account["email"],
+        "phone": account["phone"],
+        "plan": f"Gói {plan['name']} {PERIOD_LABEL[period]}" + (f" (mã {coupon['id']})" if coupon else ""),
+        "amount": final, "method": f"{method} (mô phỏng)", "status": "pending", "created_at": now_iso(),
+    })
     return get_order(order_id)
 
 
@@ -211,12 +188,11 @@ def confirm_demo_payment(order_id, account):
     order = get_order(order_id)
     if not order or order["account_id"] != account["id"]:
         raise CommerceError("Không tìm thấy đơn hàng.", 404)
-    if order["status"] != "pending":
+    paid = col("orders").find_one_and_update({"_id": order_id, "status": "pending"}, {"$set": {"status": "paid"}})
+    if not paid:
         raise CommerceError("Đơn hàng này không còn ở trạng thái chờ thanh toán.", 409)
     plan_name = re.match(r"Gói (\w+)", order["plan"]).group(1).lower()
-    with db() as conn:
-        conn.execute("UPDATE orders SET status = 'paid' WHERE id = ?", (order_id,))
-        conn.execute("UPDATE accounts SET plan = ? WHERE id = ?", (plan_name, account["id"]))
+    col("accounts").update_one({"_id": account["id"]}, {"$set": {"plan": plan_name}})
     return get_order(order_id)
 
 
@@ -225,6 +201,5 @@ def set_order_status(order_id, status):
         raise CommerceError("Trạng thái đơn hàng không hợp lệ.")
     if not get_order(order_id):
         raise CommerceError("Không tìm thấy đơn hàng.", 404)
-    with db() as conn:
-        conn.execute("UPDATE orders SET status = ? WHERE id = ?", (status, order_id))
+    col("orders").update_one({"_id": order_id}, {"$set": {"status": status}})
     return get_order(order_id)

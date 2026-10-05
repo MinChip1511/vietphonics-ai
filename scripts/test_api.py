@@ -1,4 +1,4 @@
-"""API tests on a throwaway database (no model is loaded, nothing touches backend/vietphonics.db).
+"""API tests on an in-memory MongoDB (mongomock; no model is loaded, no server needed).
 
 Run from the repo root:  backend/venv/bin/python scripts/test_api.py
 Covers the bug-report items B6 (family isolation), M7/M8/M9 (account admin), M13/M14/M16/M17 (shared
@@ -6,12 +6,14 @@ content), M1/M2 (one points balance, no points for failed words) and the admin/p
 """
 import os
 import sys
-import tempfile
+import uuid
 from pathlib import Path
 
-TMP = tempfile.mkdtemp(prefix="vp-test-")
-os.environ["VIETPHONICS_DB"] = str(Path(TMP) / "test.db")
-os.environ["VIETPHONICS_UPLOADS"] = str(Path(TMP) / "uploads")
+# Default: in-memory MongoDB (mongomock), nothing to install. To run the same suite against a real server
+# (e.g. an Atlas cluster) set TEST_MONGODB_URI; it uses a throw-away database that is dropped at the end.
+LIVE_URI = os.environ.get("TEST_MONGODB_URI")
+os.environ["MONGODB_URI"] = LIVE_URI or "mongomock://"
+os.environ["MONGODB_DB"] = f"vp_test_{uuid.uuid4().hex[:8]}"
 os.environ["VIETPHONICS_ENV"] = "development"
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
@@ -316,4 +318,8 @@ if __name__ == "__main__":
             failed += 1
             print(f"FAIL  {fn.__name__}: {type(exc).__name__}: {exc}")
     print(f"\n{len(CASES) - failed}/{len(CASES)} passed")
+    if LIVE_URI:
+        from backend.app.database import get_db
+
+        get_db().client.drop_database(os.environ["MONGODB_DB"])
     sys.exit(1 if failed else 0)

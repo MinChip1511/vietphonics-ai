@@ -20,6 +20,6 @@ echo "== Frontend: lint and production build"
 
 echo "== Deployment files"
 $PY -c "import json; json.load(open('frontend/vercel.json')); print('vercel.json ok')"
-$PY -c "import re; s=open('render.yaml').read(); assert 'healthCheckPath: /api/health' in s and 'mountPath' in s; print('render.yaml ok')"
+$PY -c "import re; s=open('render.yaml').read(); assert 'healthCheckPath: /api/health' in s and 'MONGODB_URI' in s and 'mountPath' not in s; print('render.yaml ok')"
 
 echo "All checks passed."

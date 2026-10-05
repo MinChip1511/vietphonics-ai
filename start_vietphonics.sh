@@ -7,6 +7,13 @@ echo "=================================================="
 
 PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+# Data lives in MongoDB: export MONGODB_URI (Atlas or a local mongod). Without it this script uses an
+# in-memory database, so everything resets when you stop it.
+if [ -z "$MONGODB_URI" ]; then
+  export MONGODB_URI="mongomock://"
+  echo "⚠️  MONGODB_URI is not set: using an in-memory database (data is lost on exit)."
+fi
+
 # 1. Start Backend API
 echo "Starting Backend API on http://127.0.0.1:8000 ..."
 cd "$PROJECT_DIR"

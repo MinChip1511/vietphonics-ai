@@ -1,6 +1,5 @@
 # Render Blueprint: the API (FastAPI + PyTorch). The frontend goes to Vercel (frontend/vercel.json).
-# Needs a paid instance for the persistent disk (SQLite database + uploaded images). Measured on CPU the
-# model peaks at ~430 MB, so `starter` (512 MB) is very tight; `standard` (2 GB) is the safe choice.
+# Data lives in MongoDB (Atlas), reward images included, so the service needs no persistent disk.
 services:
   - type: web
     name: vietphonics-api
@@ -11,19 +10,15 @@ services:
     region: singapore
     healthCheckPath: /api/health
     autoDeploy: true
-    disk:
-      name: vietphonics-data
-      mountPath: /var/data
-      sizeGB: 2
     envVars:
       - key: VIETPHONICS_ENV
         value: production
-      - key: VIETPHONICS_DB
-        value: /var/data/vietphonics.db
-      - key: VIETPHONICS_UPLOADS
-        value: /var/data/uploads
+      - key: MONGODB_URI
+        sync: false   # the Atlas connection string, asked for when the blueprint is created
+      - key: MONGODB_DB
+        value: vietphonics
       - key: VIETPHONICS_ADMIN_EMAIL
-        sync: false   # asked for when the blueprint is created
+        sync: false
       - key: VIETPHONICS_ADMIN_PASSWORD
         sync: false
       - key: VIETPHONICS_CORS
