@@ -517,6 +517,27 @@ def a_failing_mail_provider_does_not_leak_which_emails_exist():
         email_service.send_email = original
 
 
+@case
+def admin_can_test_email_and_sees_the_real_provider_error():
+    atok, _ = login(*ADMIN)
+    ptok, _ = login(*PARENT)
+    email_service.OUTBOX.clear()
+    assert client.post("/api/admin/email/test", headers=auth(ptok), json={"to": "x@example.com"}).status_code == 403
+    assert client.post("/api/admin/email/test", headers=auth(atok), json={"to": "bad"}).status_code == 422
+    ok = client.post("/api/admin/email/test", headers=auth(atok), json={"to": "me@example.com"})
+    assert ok.status_code == 200 and [m["to"] for m in email_service.OUTBOX] == ["me@example.com"]
+    original = email_service.send_email
+    def broken(*args, **kwargs):
+        raise email_service.EmailUnavailable("SMTP failed: (535, b'Username and Password not accepted')")
+    email_service.send_email = broken
+    try:
+        r = client.post("/api/admin/email/test", headers=auth(atok), json={"to": "me@example.com"})
+        assert r.status_code == 502 and "535" in r.json()["detail"]
+    finally:
+        email_service.send_email = original
+    assert "email" in client.get("/api/health").json()
+
+
 if __name__ == "__main__":
     failed = 0
     for fn in CASES:

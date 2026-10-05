@@ -19,7 +19,7 @@ from .alignment import (
 from .accounts import AuthError
 from .audio_quality import analyze_signal
 from . import config
-from . import database
+from . import database, email_service
 from .catalog import CatalogError, get_lesson
 from .commerce import CommerceError
 from .database import init_db
@@ -330,6 +330,7 @@ def health_check():
     return {
         "status": "healthy" if database.READY else "degraded",
         "database": "ok" if database.READY else "unavailable",
+        "email": config.EMAIL_PROVIDER if email_service.configured() else "not configured",
         "service": "VietPhonics AI Backend",
         "model_loaded": AI_STATE["model_loaded"],
         "device": AI_STATE["device"],

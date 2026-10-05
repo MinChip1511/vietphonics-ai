@@ -5,10 +5,11 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from pydantic import BaseModel
 
-from .. import accounts, catalog, commerce, kids
+from .. import accounts, catalog, commerce, config, email_service, kids
 from ..database import col, now_iso, utc_now
+from ..ratelimit import limit_by_account
 from ..security import admin_account
-from ..validation import ValidationError
+from ..validation import ValidationError, clean_email
 
 router = APIRouter(prefix="/api/admin", tags=["admin"], dependencies=[Depends(admin_account)])
 
@@ -36,6 +37,10 @@ class NewParentBody(BaseModel):
 class AccountPatch(BaseModel):
     status: Optional[str] = None
     plan: Optional[str] = None
+
+
+class EmailTestBody(BaseModel):
+    to: str
 
 
 class StatusBody(BaseModel):
@@ -311,3 +316,18 @@ def update_settings(body: dict, admin: dict = Depends(admin_account)):
 @router.get("/audit")
 def audit_log():
     return _audit_rows()
+
+
+@router.post("/email/test")
+def email_test(body: EmailTestBody, admin: dict = limit_by_account("email_test", 5, 60)):
+    """Sends a test mail and returns the provider's real error. Emailed sign-in codes hide failures on
+    purpose (so they never reveal which accounts exist); this admin-only check shows them."""
+    to = clean_email(body.to)
+    if not email_service.configured():
+        raise HTTPException(status_code=503, detail=f"Chưa cấu hình gửi email (EMAIL_PROVIDER={config.EMAIL_PROVIDER}). Kiểm tra các biến EMAIL_PROVIDER, SMTP_USER, SMTP_PASSWORD trên Render.")
+    try:
+        email_service.send_email(to, "Thư thử VietPhonics AI", "Nếu bạn đọc được thư này, việc gửi email của VietPhonics AI đã hoạt động.")
+    except email_service.EmailUnavailable as exc:
+        raise HTTPException(status_code=502, detail=f"Gửi thất bại: {exc}")
+    audit(admin, f"Gửi email thử tới {to}")
+    return {"status": "sent", "provider": config.EMAIL_PROVIDER}

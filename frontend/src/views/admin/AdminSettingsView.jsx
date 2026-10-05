@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import { Card } from "../../components/ui";
 import { useStore } from "../../services/store";
 import { timeAgo } from "../parent/parentUtils";
@@ -11,7 +11,15 @@ const RETENTION_OPTIONS = [30, 60, 90, 180, 365];
 export default function AdminSettingsView() {
   const { admin } = useStore();
   const toast = useToast();
+  const [mailTo, setMailTo] = useState("");
+  const [mailResult, setMailResult] = useState(null); // {ok, text}
   if (!admin.data) return <AdminLoading />;
+
+  const sendTestMail = async () => {
+    setMailResult(null);
+    const result = await admin.request("/email/test", { method: "POST", body: { to: mailTo.trim() } });
+    setMailResult(result.ok ? { ok: true, text: `Đã gửi thư thử tới ${mailTo.trim()} (${result.data.provider}). Kiểm tra hộp thư và cả mục thư rác.` } : { ok: false, text: result.error });
+  };
   const { settings, audit } = admin.data;
 
   return (
@@ -47,6 +55,15 @@ export default function AdminSettingsView() {
               <p className="text-xs text-vp-muted">Hiện hệ thống chưa lưu file ghi âm của bé. Thiết lập này sẽ có hiệu lực khi tính năng lưu trữ được bật.</p>
             </div>
           </div>
+        </Card>
+        <Card className="p-5 flex flex-col gap-3" data-testid="email-test">
+          <p className="font-bold text-vp-ink">Kiểm tra gửi email</p>
+          <p className="text-xs text-vp-muted">Gửi một thư thử để biết việc gửi mã xác thực qua email có hoạt động không. Nếu lỗi, thông báo bên dưới là lỗi thật từ nhà cung cấp.</p>
+          <div className="flex gap-2">
+            <input data-testid="email-test-to" type="email" value={mailTo} onChange={(e) => setMailTo(e.target.value)} placeholder="email nhận thư thử" className="h-10 flex-1 min-w-0 rounded-lg border border-vp-border px-3 text-sm" />
+            <button data-testid="email-test-send" onClick={sendTestMail} disabled={!mailTo.trim()} className="h-10 rounded-lg bg-vp-blue px-4 text-sm font-bold text-white disabled:opacity-50">Gửi thử</button>
+          </div>
+          {mailResult && <p data-testid="email-test-result" className={`rounded-lg px-3 py-2 text-xs font-semibold ${mailResult.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-600"}`}>{mailResult.text}</p>}
         </Card>
         <Card className="p-5 flex flex-col gap-3">
           <p className="font-bold text-vp-ink">Nhật ký hệ thống (Audit Logs)</p>
