@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Smartphone, Mail, Send, Lock, RotateCcw, CheckCircle2, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Mail, Send, Lock, RotateCcw, CheckCircle2, ShieldCheck } from "lucide-react";
 import { useStore, passwordStrength } from "../../services/store";
-import { sanitizePhone, isValidPhone, isValidPassword, PHONE_ERROR, PASSWORD_HINT } from "../../services/validators";
+import { isValidPassword, PASSWORD_HINT } from "../../services/validators";
 import AuthLayout, { AuthField, PasswordInput, authInput } from "./AuthLayout";
 
 // Figma: Quên Mật Khẩu (70:2902)
@@ -43,8 +43,7 @@ function OtpBoxes({ value, onChange }) {
 
 export default function ForgotPasswordView({ nav, onLoggedIn }) {
   const { auth } = useStore();
-  const [tab, setTab] = useState("otp");
-  const [identifier, setIdentifier] = useState("");
+  const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [expires, setExpires] = useState(0);
   const [code, setCode] = useState("");
@@ -64,13 +63,8 @@ export default function ForgotPasswordView({ nav, onLoggedIn }) {
 
   const send = async () => {
     setError(null);
-    if (tab === "otp") {
-      if (!isValidPhone(identifier)) return setError(PHONE_ERROR);
-    } else if (!identifier.includes("@")) {
-      return setError("Email chưa đúng định dạng.");
-    }
-    // The code is tied to the account's phone: for the email tab the user still enters the phone's code.
-    const res = tab === "otp" ? await auth.sendOtp(identifier) : { ok: true };
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) return setError("Email chưa đúng định dạng.");
+    const res = await auth.sendCode(email.trim(), "reset");
     if (!res.ok) return setError(res.error);
     setSent(true);
     setExpires(300);
@@ -79,11 +73,11 @@ export default function ForgotPasswordView({ nav, onLoggedIn }) {
   const submit = async (e) => {
     e.preventDefault();
     setError(null);
-    if (!sent) return setError("Vui lòng gửi và nhập mã OTP trước.");
-    if (expires <= 0) return setError("Mã OTP đã hết hạn, vui lòng gửi lại.");
+    if (!sent) return setError("Vui lòng gửi mã và nhập mã trong email trước.");
+    if (expires <= 0) return setError("Mã đã hết hạn, vui lòng gửi lại.");
     if (!isValidPassword(pw)) return setError(`Mật khẩu chưa đủ mạnh. ${PASSWORD_HINT}`);
     if (pw !== pw2) return setError("Hai mật khẩu chưa khớp nhau.");
-    const res = await auth.resetPassword(identifier, code, pw);
+    const res = await auth.resetPassword(email.trim(), code, pw);
     if (!res.ok) return setError(res.error);
     onLoggedIn(res.user);
   };
@@ -94,31 +88,24 @@ export default function ForgotPasswordView({ nav, onLoggedIn }) {
         <button type="button" onClick={nav.login} className="self-start flex items-center gap-1 rounded-full bg-[#EEF1FA] px-3 py-1 text-xs font-semibold text-vp-ink"><ArrowLeft className="w-3.5 h-3.5" /> Quay lại Đăng nhập</button>
         <div>
           <h1 className="font-heading text-3xl font-extrabold text-vp-ink">Quên mật khẩu?</h1>
-          <p className="text-sm text-vp-muted">Nhập thông tin tài khoản ba mẹ đã dùng để đăng ký VietPhonics AI để nhận mã bảo mật.</p>
-        </div>
-        <div className="grid grid-cols-2 rounded-full bg-[#EEF1FA] p-1">
-          {[{ id: "otp", label: "Số điện thoại / OTP", icon: Smartphone }, { id: "email", label: "Email", icon: Mail }].map(({ id, label, icon: Icon }) => (
-            <button type="button" key={id} onClick={() => { setTab(id); setSent(false); setIdentifier(""); setCode(""); }} className={`flex items-center justify-center gap-2 h-9 rounded-full text-xs sm:text-sm font-bold ${tab === id ? "bg-vp-blue text-white" : "text-vp-ink"}`}>
-              <Icon className="w-4 h-4" /> {label}
-            </button>
-          ))}
+          <p className="text-sm text-vp-muted">Nhập email ba mẹ đã dùng để đăng ký VietPhonics AI. Nếu email có tài khoản, mã bảo mật 6 số sẽ được gửi tới đó.</p>
         </div>
         <AuthField
-          label={tab === "otp" ? "Số điện thoại đã đăng ký *" : "Email đã đăng ký *"}
-          icon={tab === "otp" ? Smartphone : Mail}
+          label="Email đã đăng ký *"
+          icon={Mail}
           right={
             <button type="button" data-testid="forgot-send" onClick={send} disabled={sent && expires > 240} className="h-12 shrink-0 rounded-full bg-vp-sky px-4 text-sm font-bold text-vp-blue disabled:opacity-60 flex items-center gap-1.5">
-              <Send className="w-4 h-4" /> {sent ? "Gửi lại" : "Gửi mã xác thực OTP"}
+              <Send className="w-4 h-4" /> {sent ? "Gửi lại" : "Gửi mã xác thực"}
             </button>
           }
         >
-          <input data-testid="forgot-identifier" className={authInput} value={identifier} onChange={(e) => { setIdentifier(tab === "otp" ? sanitizePhone(e.target.value) : e.target.value); setError(null); }} maxLength={tab === "otp" ? 10 : 100} inputMode={tab === "otp" ? "numeric" : "email"} placeholder={tab === "otp" ? "0912458921" : "phuhuynh@vietphonics.vn"} />
+          <input data-testid="forgot-identifier" className={authInput} type="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(null); }} maxLength={120} placeholder="phuhuynh@gmail.com" />
         </AuthField>
 
         {sent && (
           <div className="rounded-2xl bg-[#EEF1FA] p-4 flex flex-col gap-3">
             <div className="flex justify-between text-xs">
-              <span className="font-bold text-vp-ink">Nhập mã bảo mật OTP 6 chữ số  (demo: mã do nhóm phát triển cung cấp riêng)</span>
+              <span className="font-bold text-vp-ink">Nhập mã 6 số trong email (kiểm tra cả mục thư rác)</span>
               <span className="text-vp-muted">Hiệu lực: <b className="text-amber-600">{mm}:{ss}</b></span>
             </div>
             <OtpBoxes value={code} onChange={setCode} />

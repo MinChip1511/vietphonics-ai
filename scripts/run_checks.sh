@@ -9,7 +9,7 @@ echo "== Python: static check"
 $PY -m pyflakes backend/app scripts/*.py
 
 echo "== Python: unit and API tests"
-for t in alignment verification audio_quality api production; do
+for t in alignment verification audio_quality email api production; do
   echo "-- test_$t"
   nice -n 10 $PY scripts/test_$t.py 2>&1 | grep -v "Deprecat\|from starlette" | tail -3
   test "${PIPESTATUS[0]}" -eq 0

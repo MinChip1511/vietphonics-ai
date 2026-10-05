@@ -41,6 +41,11 @@ def _limiter(name, max_calls, per_seconds):
     return LIMITERS.setdefault(name, RateLimiter(max_calls, per_seconds))
 
 
+def allow_key(name, key, max_calls, per_seconds) -> bool:
+    """One call against a named limit for an arbitrary key (e.g. an email address)."""
+    return _limiter(name, max_calls, per_seconds).allow(key)
+
+
 def client_ip(request: Request) -> str:
     # Uvicorn (--proxy-headers) has already replaced the peer with the forwarded client address.
     return request.client.host if request.client else "unknown"

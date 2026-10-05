@@ -1,15 +1,16 @@
 import React, { useEffect, useState } from "react";
-import { Phone, Mail, Lock, KeyRound, Send, ArrowRight, Smartphone, ShieldCheck, Gift } from "lucide-react";
+import { Mail, Lock, KeyRound, Send, ArrowRight, ShieldCheck, Gift } from "lucide-react";
 import { useStore } from "../../services/store";
 import { HOTLINE } from "../../constants";
-import { sanitizePhone, isValidPhone, PHONE_ERROR } from "../../services/validators";
 import AuthLayout, { AuthField, PasswordInput, authInput } from "./AuthLayout";
 
-// Figma: Login/OTP (69:1742) and Login/Email (127:5768).
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+// Figma: Login/OTP (69:1742) and Login/Email (127:5768). The "OTP" tab signs in with a code emailed to the parent.
 export default function LoginView({ nav, onLoggedIn, notice }) {
   const { auth } = useStore();
   const [tab, setTab] = useState("otp");
-  const [phone, setPhone] = useState("");
+  const [codeEmail, setCodeEmail] = useState("");
   const [otp, setOtp] = useState("");
   const [otpSent, setOtpSent] = useState(false);
   const [cooldown, setCooldown] = useState(0);
@@ -26,23 +27,22 @@ export default function LoginView({ nav, onLoggedIn, notice }) {
     return () => clearTimeout(t);
   }, [cooldown]);
 
-  const sendOtp = async () => {
+  const sendCode = async () => {
     setError(null);
-    if (!isValidPhone(phone)) return setError(PHONE_ERROR);
-    const res = await auth.sendOtp(phone);
+    if (!EMAIL_RE.test(codeEmail.trim())) return setError("Email chưa đúng định dạng.");
+    const res = await auth.sendCode(codeEmail.trim(), "login");
     if (!res.ok) return setError(res.error);
     setOtpSent(true);
     setCooldown(60);
-    // Demo build: no SMS is sent, and the demo code is deliberately not printed on this public page.
-    setInfo("Chức năng demo: hệ thống chưa gửi tin nhắn SMS thật. Mã xác thực demo do nhóm phát triển cung cấp riêng.");
+    setInfo("Nếu email này có tài khoản, mã 6 số đã được gửi. Mã có hiệu lực 5 phút, hãy kiểm tra cả mục thư rác.");
   };
 
   const submit = async (e) => {
     e.preventDefault();
     setError(null);
-    if (tab === "otp" && !isValidPhone(phone)) return setError(PHONE_ERROR);
+    if (tab === "otp" && !EMAIL_RE.test(codeEmail.trim())) return setError("Email chưa đúng định dạng.");
     setBusy(true);
-    const res = tab === "otp" ? await auth.loginWithOtp(phone, otp, remember) : await auth.loginWithPassword(email, password, remember);
+    const res = tab === "otp" ? await auth.loginWithCode(codeEmail.trim(), otp, remember) : await auth.loginWithPassword(email, password, remember);
     setBusy(false);
     if (!res.ok) return setError(res.error);
     onLoggedIn(res.user);
@@ -62,7 +62,7 @@ export default function LoginView({ nav, onLoggedIn, notice }) {
         {notice && <p className="rounded-xl bg-vp-sky px-4 py-3 text-sm font-semibold text-vp-blue">{notice}</p>}
 
         <div className="grid grid-cols-2 rounded-full bg-[#EEF1FA] p-1">
-          {[{ id: "otp", label: "Số điện thoại / OTP", icon: Smartphone }, { id: "email", label: "Email & Mật khẩu", icon: Mail }].map(({ id, label, icon: Icon }) => (
+          {[{ id: "otp", label: "Email + mã xác thực", icon: KeyRound }, { id: "email", label: "Email & Mật khẩu", icon: Mail }].map(({ id, label, icon: Icon }) => (
             <button key={id} data-testid={`tab-${id}`} onClick={() => switchTab(id)} className={`flex items-center justify-center gap-2 h-9 rounded-full text-xs sm:text-sm font-bold ${tab === id ? "bg-vp-blue text-white" : "text-vp-ink"}`}>
               <Icon className="w-4 h-4" /> <span className="truncate">{label}</span>
             </button>
@@ -72,19 +72,19 @@ export default function LoginView({ nav, onLoggedIn, notice }) {
         <form onSubmit={submit} className="flex flex-col gap-5">
           {tab === "otp" ? (
             <>
-              <AuthField label="Số điện thoại phụ huynh" icon={Phone}>
-                <input data-testid="login-phone" className={authInput} inputMode="numeric" autoComplete="tel" value={phone} onChange={edit(setPhone, sanitizePhone)} maxLength={10} placeholder="0912345678" />
+              <AuthField label="Email phụ huynh" icon={Mail}>
+                <input data-testid="login-code-email" className={authInput} type="email" autoComplete="username" value={codeEmail} onChange={edit(setCodeEmail)} placeholder="phuhuynh@gmail.com" />
               </AuthField>
               <AuthField
-                label="Mã xác thực OTP"
+                label="Mã xác thực 6 số"
                 icon={KeyRound}
                 right={
-                  <button type="button" data-testid="send-otp" onClick={sendOtp} disabled={cooldown > 0} className="h-12 shrink-0 rounded-full bg-vp-sky px-4 text-sm font-bold text-vp-blue disabled:opacity-60 flex items-center gap-1.5">
-                    <Send className="w-4 h-4" /> {cooldown > 0 ? `${cooldown}s` : otpSent ? "Gửi lại" : "Gửi mã OTP"}
+                  <button type="button" data-testid="send-otp" onClick={sendCode} disabled={cooldown > 0} className="h-12 shrink-0 rounded-full bg-vp-sky px-4 text-sm font-bold text-vp-blue disabled:opacity-60 flex items-center gap-1.5">
+                    <Send className="w-4 h-4" /> {cooldown > 0 ? `${cooldown}s` : otpSent ? "Gửi lại" : "Gửi mã"}
                   </button>
                 }
               >
-                <input data-testid="login-otp" className={authInput} inputMode="numeric" maxLength={6} value={otp} onChange={edit(setOtp, (v) => v.replace(/\D/g, ""))} placeholder="6 chữ số OTP" />
+                <input data-testid="login-otp" className={authInput} inputMode="numeric" maxLength={6} value={otp} onChange={edit(setOtp, (v) => v.replace(/\D/g, ""))} placeholder="Nhập mã trong email" />
               </AuthField>
             </>
           ) : (
@@ -101,7 +101,7 @@ export default function LoginView({ nav, onLoggedIn, notice }) {
           <label className="flex items-center gap-2 text-sm text-vp-ink">
             <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="w-4 h-4 accent-[#1978dc]" /> Ghi nhớ đăng nhập an toàn
           </label>
-          {info && tab === "otp" && <p data-testid="otp-demo-note" className="rounded-xl bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700">{info}</p>}
+          {info && tab === "otp" && <p data-testid="otp-info" className="rounded-xl bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700">{info}</p>}
           {error && <p data-testid="login-error" className="rounded-xl bg-red-50 px-4 py-2 text-sm font-semibold text-red-500">{error}</p>}
 
           <button data-testid="login-submit" type="submit" disabled={busy} className="h-14 rounded-full bg-vp-blue text-base font-bold text-white hover:brightness-110 disabled:opacity-60 flex items-center justify-center gap-2">

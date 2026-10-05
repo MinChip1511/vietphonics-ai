@@ -1,11 +1,11 @@
 """Sign-up, sign-in, one-time codes and password endpoints."""
 from typing import Optional
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from .. import accounts
-from ..ratelimit import limit_by_ip
+from ..ratelimit import allow_key, limit_by_ip
 from ..security import current_account, revoke_session, token_from_header
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -24,18 +24,19 @@ class LoginBody(BaseModel):
     remember: bool = True
 
 
-class OtpSendBody(BaseModel):
-    phone: str
+class CodeSendBody(BaseModel):
+    email: str
+    purpose: str = "login"
 
 
-class OtpLoginBody(BaseModel):
-    phone: str
+class CodeLoginBody(BaseModel):
+    email: str
     code: str
     remember: bool = True
 
 
 class ResetBody(BaseModel):
-    identifier: str
+    email: str
     code: str
     new_password: str
 
@@ -62,20 +63,23 @@ def login(body: LoginBody):
     return _session(token, row)
 
 
-@router.post("/otp/send", dependencies=[limit_by_ip("otp", 10, 600)])
-def otp_send(body: OtpSendBody):
-    return accounts.send_otp(body.phone)
+@router.post("/code/send", dependencies=[limit_by_ip("code", 10, 600)])
+def code_send(body: CodeSendBody):
+    # At most 3 codes per email per 10 minutes, so the endpoint cannot be used to flood someone's inbox.
+    if not allow_key("code_email", body.email.strip().lower(), 3, 600):
+        raise HTTPException(status_code=429, detail="Bạn đã yêu cầu mã quá nhiều lần. Vui lòng thử lại sau ít phút.")
+    return accounts.send_code(body.email, body.purpose)
 
 
-@router.post("/otp/login", dependencies=[limit_by_ip("otp", 10, 600)])
-def otp_login(body: OtpLoginBody):
-    token, row = accounts.login_with_otp(body.phone, body.code, body.remember)
+@router.post("/code/login", dependencies=[limit_by_ip("code", 10, 600)])
+def code_login(body: CodeLoginBody):
+    token, row = accounts.login_with_code(body.email, body.code, body.remember)
     return _session(token, row)
 
 
-@router.post("/password/reset", dependencies=[limit_by_ip("otp", 10, 600)])
+@router.post("/password/reset", dependencies=[limit_by_ip("code", 10, 600)])
 def password_reset(body: ResetBody):
-    token, row = accounts.reset_password(body.identifier, body.code, body.new_password)
+    token, row = accounts.reset_password(body.email, body.code, body.new_password)
     return _session(token, row)
 
 

@@ -141,13 +141,14 @@ export function StoreProvider({ children: appChildren }) {
   const auth = useMemo(() => ({
     loginWithPassword: (email, password, keep = true) =>
       attempt(async () => openSession(await api("/auth/login", { method: "POST", body: { email, password, remember: keep } }), keep)),
-    sendOtp: (phone) => attempt(() => api("/auth/otp/send", { method: "POST", body: { phone } })),
-    loginWithOtp: (phone, code, keep = true) =>
-      attempt(async () => openSession(await api("/auth/otp/login", { method: "POST", body: { phone, code, remember: keep } }), keep)),
+    // One-time codes are emailed (6 random digits, 5 minutes, single use).
+    sendCode: (email, purpose) => attempt(() => api("/auth/code/send", { method: "POST", body: { email, purpose } })),
+    loginWithCode: (email, code, keep = true) =>
+      attempt(async () => openSession(await api("/auth/code/login", { method: "POST", body: { email, code, remember: keep } }), keep)),
     register: ({ name, phone, email, password }) =>
       attempt(async () => openSession(await api("/auth/register", { method: "POST", body: { name, phone, email, password } }))),
-    resetPassword: (identifier, code, newPassword) =>
-      attempt(async () => openSession(await api("/auth/password/reset", { method: "POST", body: { identifier, code, new_password: newPassword } }))),
+    resetPassword: (email, code, newPassword) =>
+      attempt(async () => openSession(await api("/auth/password/reset", { method: "POST", body: { email, code, new_password: newPassword } }))),
     changePassword: (current, next) =>
       attempt(async () => openSession(await api("/auth/password/change", { method: "POST", body: { current_password: current, new_password: next } }))),
     availability: async ({ email, phone }) => {

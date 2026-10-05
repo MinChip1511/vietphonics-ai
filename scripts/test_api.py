@@ -15,10 +15,12 @@ LIVE_URI = os.environ.get("TEST_MONGODB_URI")
 os.environ["MONGODB_URI"] = LIVE_URI or "mongomock://"
 os.environ["MONGODB_DB"] = f"vp_test_{uuid.uuid4().hex[:8]}"
 os.environ["VIETPHONICS_ENV"] = "development"
+os.environ["EMAIL_PROVIDER"] = "memory"  # mails are collected in email_service.OUTBOX instead of being sent
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fastapi.testclient import TestClient  # noqa: E402
 
+from backend.app import email_service  # noqa: E402
 from backend.app.database import init_db  # noqa: E402
 from backend.app.kids import record_attempt  # noqa: E402
 from backend.app.main import app  # noqa: E402
@@ -150,16 +152,6 @@ def login_is_throttled_after_repeated_failures():
     for _ in range(5):
         assert client.post("/api/auth/login", json={"email": "p1@x.vn", "password": "wrong"}).status_code == 401
     assert client.post("/api/auth/login", json={"email": "p1@x.vn", "password": "Abcdefg1"}).status_code == 429
-
-
-@case
-def otp_login_and_password_reset_use_the_demo_code():
-    assert client.post("/api/auth/otp/send", json={"phone": "123"}).status_code == 422
-    assert client.post("/api/auth/otp/send", json={"phone": "0912345678"}).json()["demo"] is True
-    assert client.post("/api/auth/otp/login", json={"phone": "0912345678", "code": "000000"}).status_code == 400
-    assert client.post("/api/auth/otp/login", json={"phone": "0912345678", "code": "123456"}).status_code == 200
-    r = client.post("/api/auth/password/reset", json={"identifier": "0933444555", "code": "123456", "new_password": "weak"})
-    assert r.status_code in (400, 422)
 
 
 @case
@@ -401,15 +393,6 @@ def rate_limits_stop_floods():
 
 
 @case
-def weak_new_password_does_not_burn_the_one_time_code():
-    assert client.post("/api/auth/otp/send", json={"phone": "0933444555"}).status_code == 200
-    r = client.post("/api/auth/password/reset", json={"identifier": "0933444555", "code": "123456", "new_password": "weak"})
-    assert r.status_code == 422
-    r = client.post("/api/auth/password/reset", json={"identifier": "0933444555", "code": "123456", "new_password": "Strong123x"})
-    assert r.status_code == 200, r.text
-
-
-@case
 def api_waits_politely_while_the_database_is_not_ready():
     from backend.app import database
 
@@ -430,6 +413,108 @@ def lesson_text_fields_are_bounded():
     assert client.post("/api/admin/lessons", headers=h, json={**base, "title": "x" * 121}).status_code == 422
     assert client.post("/api/admin/lessons", headers=h, json={**base, "description": "x" * 301}).status_code == 422
     assert client.post("/api/admin/lessons", headers=h, json={**base, "difficulty": "Siêu khó"}).status_code == 422
+
+
+def last_code(to):
+    """The 6-digit code in the latest mail sent to `to` (None if nothing was sent)."""
+    import re
+
+    mails = [m for m in email_service.OUTBOX if m["to"] == to]
+    return re.search(r"\b(\d{6})\b", mails[-1]["text"]).group(1) if mails else None
+
+
+def send_code(email, purpose="login"):
+    from backend.app.ratelimit import LIMITERS
+
+    for name in ("code_email", "code"):  # these cases are about codes, not about the rate limits
+        if name in LIMITERS:
+            LIMITERS[name]._hits.clear()
+    return client.post("/api/auth/code/send", json={"email": email, "purpose": purpose})
+
+
+@case
+def emailed_code_signs_in_once_and_never_reveals_accounts():
+    email_service.OUTBOX.clear()
+    assert send_code("not-an-email").status_code == 422
+    known = send_code("phuhuynh@vietphonics.vn")
+    unknown = send_code("nobody@example.com")
+    assert known.status_code == unknown.status_code == 200 and known.json() == unknown.json()  # same answer
+    assert last_code("nobody@example.com") is None                                              # and no mail
+    code = last_code("phuhuynh@vietphonics.vn")
+    assert code and len(code) == 6
+    assert client.post("/api/auth/code/login", json={"email": "phuhuynh@vietphonics.vn", "code": "000000"}).status_code == 400
+    ok = client.post("/api/auth/code/login", json={"email": "phuhuynh@vietphonics.vn", "code": code})
+    assert ok.status_code == 200 and ok.json()["user"]["email"] == "phuhuynh@vietphonics.vn", ok.text
+    assert client.post("/api/auth/code/login", json={"email": "phuhuynh@vietphonics.vn", "code": code}).status_code == 400  # single use
+
+
+@case
+def codes_are_random_bound_to_their_purpose_and_limited_in_tries():
+    email_service.OUTBOX.clear()
+    codes = set()
+    for _ in range(3):
+        send_code("minhtoan@gmail.com")
+        codes.add(last_code("minhtoan@gmail.com"))
+    assert len(codes) > 1                                     # a new random code each time
+    code = last_code("minhtoan@gmail.com")
+    send_code("minhtoan@gmail.com", "reset")
+    reset_code = last_code("minhtoan@gmail.com")
+    assert client.post("/api/auth/code/login", json={"email": "minhtoan@gmail.com", "code": reset_code}).status_code == 400  # reset code cannot sign in
+    send_code("minhtoan@gmail.com", "login")
+    good = last_code("minhtoan@gmail.com")
+    wrong = "000000" if good != "000000" else "111111"
+    for _ in range(5):
+        assert client.post("/api/auth/code/login", json={"email": "minhtoan@gmail.com", "code": wrong}).status_code == 400
+    assert client.post("/api/auth/code/login", json={"email": "minhtoan@gmail.com", "code": good}).status_code == 400   # locked after 5 misses
+    assert code is not None
+
+
+@case
+def at_most_three_codes_per_email_per_ten_minutes():
+    from backend.app.ratelimit import LIMITERS
+
+    email_service.OUTBOX.clear()
+    LIMITERS["code_email"]._hits.clear()
+    LIMITERS["code"]._hits.clear()
+    statuses = [client.post("/api/auth/code/send", json={"email": "hongtruong@yahoo.com", "purpose": "login"}).status_code for _ in range(4)]
+    assert statuses == [200, 200, 200, 429], statuses
+    assert len([m for m in email_service.OUTBOX if m["to"] == "hongtruong@yahoo.com"]) == 3
+    LIMITERS["code_email"]._hits.clear()
+    LIMITERS["code"]._hits.clear()
+
+
+@case
+def locked_accounts_get_no_code():
+    email_service.OUTBOX.clear()
+    assert send_code("hoangquan@outlook.com").status_code == 200   # the demo account that is locked
+    assert last_code("hoangquan@outlook.com") is None
+
+
+@case
+def password_reset_by_emailed_code_and_a_weak_password_keeps_the_code():
+    email_service.OUTBOX.clear()
+    send_code("yen.vu@gmail.com", "reset")
+    code = last_code("yen.vu@gmail.com")
+    weak = client.post("/api/auth/password/reset", json={"email": "yen.vu@gmail.com", "code": code, "new_password": "weak"})
+    assert weak.status_code == 422
+    strong = client.post("/api/auth/password/reset", json={"email": "yen.vu@gmail.com", "code": code, "new_password": "Strong123x"})
+    assert strong.status_code == 200, strong.text
+    login("yen.vu@gmail.com", "Strong123x")
+    assert client.post("/api/auth/password/reset", json={"email": "yen.vu@gmail.com", "code": code, "new_password": "Another123x"}).status_code == 400
+
+
+@case
+def a_failing_mail_provider_does_not_leak_which_emails_exist():
+    original = email_service.send_email
+    def broken(*args, **kwargs):
+        raise email_service.EmailUnavailable("boom")
+    email_service.send_email = broken
+    try:
+        known = send_code("phuhuynh@vietphonics.vn")
+        unknown = send_code("nobody2@example.com")
+        assert known.status_code == unknown.status_code == 200 and known.json() == unknown.json()
+    finally:
+        email_service.send_email = original
 
 
 if __name__ == "__main__":

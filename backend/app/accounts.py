@@ -1,4 +1,5 @@
 """Accounts, sign-in, one-time codes and password changes."""
+import logging
 import secrets
 import string
 import uuid
@@ -6,7 +7,7 @@ from datetime import timedelta
 
 from pymongo.errors import DuplicateKeyError
 
-from .config import DEMO_OTP
+from . import email_service
 from .database import clean, clean_all, col, iso, now_iso, utc_now
 from .security import (
     create_session, hash_code, hash_password, revoke_account_sessions, verify_password,
@@ -15,6 +16,7 @@ from .validation import (
     ValidationError, check_password, clean_email, clean_name, clean_phone, normalize_phone,
 )
 
+log = logging.getLogger("vietphonics.accounts")
 MAX_FAILED_LOGINS = 5
 LOCKOUT_MINUTES = 15
 OTP_MINUTES = 5
@@ -116,53 +118,72 @@ def _open_session(row, remember):
     return create_session(row["id"], remember), get_account(row["id"])
 
 
-# ---- one-time codes (demo: no SMS is sent) -------------------------------------------------------
+# ---- one-time codes, sent by email -----------------------------------------------------------------
 
-def _require_otp_enabled():
-    if not DEMO_OTP:
-        raise AuthError("Đăng nhập bằng mã OTP chưa khả dụng vì hệ thống chưa kết nối dịch vụ SMS. Vui lòng dùng email và mật khẩu.", 503)
-
-
-def send_otp(phone):
-    _require_otp_enabled()
-    phone = clean_phone(phone)
-    col("otp_codes").replace_one(
-        {"_id": phone},
-        {"_id": phone, "code_hash": hash_code(DEMO_OTP), "expires_at": iso(utc_now() + timedelta(minutes=OTP_MINUTES)), "attempts": 0},
-        upsert=True,
-    )
-    return {"registered": find_by_phone(phone) is not None, "expiresInSeconds": OTP_MINUTES * 60, "demo": True}
+CODE_PURPOSES = ("login", "reset")
+GENERIC_BAD_CODE = "Mã xác thực không đúng hoặc đã hết hạn."
 
 
-def check_otp(phone, code):
-    _require_otp_enabled()
-    phone = normalize_phone(phone)
-    row = col("otp_codes").find_one({"_id": phone})
-    bad = AuthError("Mã OTP không đúng hoặc đã hết hạn.", 400)
-    if not row or row["expires_at"] < now_iso() or row["attempts"] >= OTP_MAX_ATTEMPTS:
+def send_code(email, purpose):
+    """Email a fresh random 6-digit code. It never reveals whether the email has an account: unknown or
+    locked accounts get the same answer and simply no message. Raises AuthError(503) when email is not set up."""
+    if purpose not in CODE_PURPOSES:
+        raise ValidationError("Yêu cầu không hợp lệ.")
+    email = clean_email(email)
+    if not email_service.configured():
+        raise AuthError("Gửi mã qua email chưa khả dụng. Vui lòng đăng nhập bằng email và mật khẩu.", 503)
+    row = find_by_email(email)
+    if row and row["status"] != "locked":
+        code = f"{secrets.randbelow(10 ** 6):06d}"
+        col("otp_codes").replace_one(
+            {"_id": email},
+            {"_id": email, "purpose": purpose, "code_hash": hash_code(code),
+             "expires_at": iso(utc_now() + timedelta(minutes=OTP_MINUTES)), "attempts": 0},
+            upsert=True,
+        )
+        what = "đăng nhập" if purpose == "login" else "đặt lại mật khẩu"
+        try:
+            email_service.send_email(
+                email,
+                f"Mã xác thực VietPhonics AI: {code}",
+                f"Mã {what} của bạn là {code}.\nMã có hiệu lực {OTP_MINUTES} phút và chỉ dùng một lần.\n"
+                "Nếu bạn không yêu cầu, hãy bỏ qua email này; tài khoản của bạn vẫn an toàn.",
+                f"<p>Mã {what} của bạn là:</p><p style=\"font-size:28px;font-weight:bold;letter-spacing:4px\">{code}</p>"
+                f"<p>Mã có hiệu lực {OTP_MINUTES} phút và chỉ dùng một lần.</p>"
+                "<p style=\"color:#666\">Nếu bạn không yêu cầu, hãy bỏ qua email này; tài khoản của bạn vẫn an toàn.</p>",
+            )
+        except email_service.EmailUnavailable:
+            log.exception("Could not send a verification email")  # same answer to the caller: no leak
+    return {"sent": True, "expiresInSeconds": OTP_MINUTES * 60}
+
+
+def check_code(email, code, purpose):
+    email = str(email or "").strip().lower()
+    row = col("otp_codes").find_one({"_id": email})
+    bad = AuthError(GENERIC_BAD_CODE, 400)
+    if not row or row.get("purpose") != purpose or row["expires_at"] < now_iso() or row["attempts"] >= OTP_MAX_ATTEMPTS:
         raise bad
-    if hash_code(str(code or "")) != row["code_hash"]:
-        col("otp_codes").update_one({"_id": phone}, {"$inc": {"attempts": 1}})
+    if hash_code(str(code or "").strip()) != row["code_hash"]:
+        col("otp_codes").update_one({"_id": email}, {"$inc": {"attempts": 1}})
         raise bad
-    col("otp_codes").delete_one({"_id": phone})
+    col("otp_codes").delete_one({"_id": email})  # one use only
 
 
-def login_with_otp(phone, code, remember=True):
-    check_otp(phone, code)
-    row = find_by_phone(phone)
+def login_with_code(email, code, remember=True):
+    check_code(email, code, "login")
+    row = find_by_email(email)
     if not row:
-        raise AuthError("Số điện thoại này chưa đăng ký tài khoản.", 404)
+        raise AuthError(GENERIC_BAD_CODE, 400)
     return _open_session(row, remember)
 
 
-def reset_password(identifier, code, new_password):
-    """Password reset with the one-time code of the account's phone (demo code, see DEMO_OTP)."""
-    ident = str(identifier or "").strip()
-    row = find_by_email(ident) if "@" in ident else find_by_phone(ident)
-    if not row:
-        raise AuthError("Không tìm thấy tài khoản với thông tin này.", 404)
+def reset_password(email, code, new_password):
+    """Password reset with the code emailed to the account."""
     check_password(new_password)  # first: a weak password must not burn the one-time code
-    check_otp(row["phone"], code)
+    check_code(email, code, "reset")
+    row = find_by_email(email)
+    if not row:
+        raise AuthError(GENERIC_BAD_CODE, 400)
     set_password(row["id"], new_password, must_change=False)
     return _open_session(get_account(row["id"]), True)
 

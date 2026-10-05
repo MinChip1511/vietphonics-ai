@@ -16,7 +16,7 @@ os.environ.update({
     "VIETPHONICS_ADMIN_PASSWORD": "Owner-Pass-12345",
     "VIETPHONICS_CORS": "https://app.vercel.example",
 })
-os.environ.pop("VIETPHONICS_DEMO_OTP", None)
+os.environ.pop("EMAIL_PROVIDER", None)  # production default: none
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from fastapi.testclient import TestClient  # noqa: E402
@@ -52,9 +52,9 @@ def an_unset_environment_means_production():
     import subprocess
 
     env = {k: v for k, v in os.environ.items() if not k.startswith("VIETPHONICS_")}
-    out = subprocess.run([sys.executable, "-c", "from backend.app import config; print(config.PRODUCTION, config.DEMO_OTP, config.CORS_ORIGINS)"],
+    out = subprocess.run([sys.executable, "-c", "from backend.app import config; print(config.PRODUCTION, config.EMAIL_PROVIDER, config.CORS_ORIGINS)"],
                          env=env, capture_output=True, text=True, cwd=Path(__file__).resolve().parent.parent)
-    assert out.stdout.strip() == "True None []", out.stdout + out.stderr
+    assert out.stdout.strip() == "True none []", out.stdout + out.stderr
 
 
 @case
@@ -80,11 +80,10 @@ def reference_data_is_seeded_without_demo_content():
 
 
 @case
-def phone_code_signin_and_reset_are_off_without_an_sms_provider():
-    assert client.post("/api/auth/otp/send", json={"phone": "0912345678"}).status_code == 503
-    assert client.post("/api/auth/otp/login", json={"phone": "0912345678", "code": "123456"}).status_code == 503
-    r = client.post("/api/auth/password/reset", json={"identifier": "owner@vietphonics.example", "code": "123456", "new_password": "Newpass123"})
-    assert r.status_code == 503
+def emailed_codes_are_off_until_a_provider_is_configured():
+    assert client.post("/api/auth/code/send", json={"email": "owner@vietphonics.example", "purpose": "login"}).status_code == 503
+    r = client.post("/api/auth/password/reset", json={"email": "owner@vietphonics.example", "code": "123456", "new_password": "Newpass123"})
+    assert r.status_code == 400  # no code was ever issued
     assert login("owner@vietphonics.example", "Owner-Pass-12345").status_code == 200  # password unchanged
 
 

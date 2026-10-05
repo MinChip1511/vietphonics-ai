@@ -12,7 +12,7 @@ Trình duyệt chỉ nói chuyện với Vercel, nên không cần cấu hình C
 ## Giới hạn cần biết trước
 - **Dữ liệu nằm trong MongoDB Atlas**, không cần ổ đĩa trên Render, nên deploy lại không mất dữ liệu. Gói Atlas M0 miễn phí đủ để chạy thử.
 - **RAM của Render:** model chiếm ~430 MB khi chấm; blueprint dùng `standard` (2 GB).
-- **Đăng nhập bằng OTP và "Quên mật khẩu" bị tắt trong production** vì chưa có dịch vụ SMS/email (một mã cố định sẽ cho phép chiếm tài khoản). Phụ huynh đăng nhập bằng email + mật khẩu; admin cấp lại mật khẩu tạm khi cần. Muốn bật lại cần nối nhà cung cấp SMS/email.
+- **Mã xác thực gửi qua email** (đăng nhập bằng mã, quên mật khẩu): cần cấu hình gửi email (mục 2b). Chưa cấu hình thì tính năng này tắt và phụ huynh đăng nhập bằng email + mật khẩu.
 - Thanh toán vẫn là mô phỏng. Hotline trong `frontend/src/constants.js` vẫn là số mẫu, cần thay số thật.
 - Backend khởi động trong vài giây và tải model ở nền: `/api/health` trả `model_loaded: false` rồi chuyển `true` sau ~20–60 giây; trong lúc đó chấm điểm trả 503.
 
@@ -29,6 +29,12 @@ git remote add origin <repo-của-bạn> && git push -u origin main
 3. **Network Access** → thêm `0.0.0.0/0` (Render không có IP cố định).
 4. **Connect → Drivers** → sao chép chuỗi kết nối `mongodb+srv://<user>:<mật-khẩu>@<cluster>.mongodb.net/...`, thay `<mật-khẩu>`. Mật khẩu có ký tự đặc biệt phải mã hóa URL.
 5. Đây là giá trị của biến `MONGODB_URI`. Ứng dụng tự tạo chỉ mục và dữ liệu mẫu (bài học, gói, phần thưởng) ở lần chạy đầu.
+
+## 2b. Gửi email (Gmail)
+1. Tài khoản Google → **Bảo mật** → bật **Xác minh 2 bước**.
+2. **Mật khẩu ứng dụng** → tạo một mật khẩu (16 ký tự).
+3. Trên Render → **Environment** thêm: `EMAIL_PROVIDER=smtp`, `SMTP_USER=<gmail của bạn>`, `SMTP_PASSWORD=<mật khẩu ứng dụng>`. Tùy chọn: `EMAIL_FROM_NAME`.
+4. Gmail gửi tối đa ~500 thư mỗi ngày. Thay bằng Brevo: `EMAIL_PROVIDER=brevo`, `BREVO_API_KEY`, `EMAIL_FROM` (địa chỉ đã xác minh trong Brevo).
 
 ## 2. Backend trên Render
 1. Render → **New → Blueprint** → chọn repo (dùng `render.yaml` ở thư mục gốc).

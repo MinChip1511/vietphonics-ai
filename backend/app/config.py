@@ -29,10 +29,20 @@ MODEL_PATH = Path(_env("VIETPHONICS_MODEL", REPO_ROOT / "papl_nccf_vietmdd.pt"))
 ADMIN_EMAIL = _env("VIETPHONICS_ADMIN_EMAIL", "admin@vietphonics.vn")
 ADMIN_PASSWORD = _env("VIETPHONICS_ADMIN_PASSWORD")
 
-# No SMS provider is connected. A one-time code exists only when VIETPHONICS_DEMO_OTP is set, or in
-# development (default 123456). In production without it, phone-code sign-in and password reset are off:
-# a fixed code would let anyone take over any account by knowing its phone number.
-DEMO_OTP = _env("VIETPHONICS_DEMO_OTP", None if PRODUCTION else "123456")
+# One-time codes (email sign-in, password reset) are random per request and sent by email.
+#   EMAIL_PROVIDER = smtp     SMTP_USER / SMTP_PASSWORD (e.g. a Gmail app password), SMTP_HOST, SMTP_PORT
+#                  = brevo    BREVO_API_KEY
+#                  = console  prints the mail in the log (development default)
+#                  = none     codes are off: the endpoints answer 503 (production default until configured)
+# EMAIL_FROM is the sender address (defaults to SMTP_USER).
+EMAIL_PROVIDER = _env("EMAIL_PROVIDER", "none" if PRODUCTION else "console").lower()
+EMAIL_FROM = _env("EMAIL_FROM")
+EMAIL_FROM_NAME = _env("EMAIL_FROM_NAME", "VietPhonics AI")
+SMTP_HOST = _env("SMTP_HOST", "smtp.gmail.com")
+SMTP_PORT = int(_env("SMTP_PORT", 465))  # 465 = SSL, 587 = STARTTLS
+SMTP_USER = _env("SMTP_USER")
+SMTP_PASSWORD = _env("SMTP_PASSWORD")
+BREVO_API_KEY = _env("BREVO_API_KEY")
 
 # Browsers on another origin than the API (e.g. Vercel calling Render directly) must be listed here.
 # With the Vercel "/api" rewrite (frontend/vercel.json) the browser stays same-origin and none is needed.
