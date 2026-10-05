@@ -48,6 +48,16 @@ def login(email, password):
 
 
 @case
+def an_unset_environment_means_production():
+    import subprocess
+
+    env = {k: v for k, v in os.environ.items() if not k.startswith("VIETPHONICS_")}
+    out = subprocess.run([sys.executable, "-c", "from backend.app import config; print(config.PRODUCTION, config.DEMO_OTP, config.CORS_ORIGINS)"],
+                         env=env, capture_output=True, text=True, cwd=Path(__file__).resolve().parent.parent)
+    assert out.stdout.strip() == "True None []", out.stdout + out.stderr
+
+
+@case
 def no_demo_accounts_exist():
     assert login("phuhuynh@vietphonics.vn", "123456").status_code == 401
     assert login("admin@vietphonics.vn", "admin123").status_code == 401
@@ -110,10 +120,14 @@ def scoring_is_unavailable_not_faked_without_the_model():
         w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000)
         samples = (int(6000 * max(0, math.sin(2 * math.pi * 1.5 * i / 16000)) * math.sin(2 * math.pi * 200 * i / 16000)) for i in range(32000))
         w.writeframes(b"".join(struct.pack("<h", v) for v in samples))
-    r = client.post("/api/analyze-audio", headers={"Authorization": f"Bearer {token}"},
-                    files={"audio": ("a.wav", buf.getvalue(), "audio/wav")}, data={"canonical": "S a w _1", "target_word": "Sao"})
+    h = {"Authorization": f"Bearer {token}"}
+    child = client.post("/api/profiles", headers=h, json={"name": "Be Thu", "age": 5}).json()["id"]
+    word = client.get("/api/lessons/lesson-0").json()["words"][0]["id"]
+    form = {"child_id": child, "lesson_id": "lesson-0", "word_id": word}
+    r = client.post("/api/analyze-audio", headers=h, files={"audio": ("a.wav", buf.getvalue(), "audio/wav")}, data=form)
     assert r.status_code == 503, r.text
-    assert client.post("/api/analyze-audio", files={"audio": ("a.wav", b"x", "audio/wav")}, data={"canonical": "a"}).status_code == 401
+    anonymous = client.post("/api/analyze-audio", files={"audio": ("a.wav", b"x", "audio/wav")}, data=form)
+    assert anonymous.status_code == 401
 
 
 @case

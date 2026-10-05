@@ -9,6 +9,8 @@ PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Data lives in MongoDB: export MONGODB_URI (Atlas or a local mongod). Without it this script uses an
 # in-memory database, so everything resets when you stop it.
+# Local runs are development (demo accounts, OTP 123456, open CORS); anything else is production.
+export VIETPHONICS_ENV="${VIETPHONICS_ENV:-development}"
 if [ -z "$MONGODB_URI" ]; then
   export MONGODB_URI="mongomock://"
   echo "⚠️  MONGODB_URI is not set: using an in-memory database (data is lost on exit)."

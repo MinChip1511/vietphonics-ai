@@ -16,7 +16,7 @@ const STAGES = [
   { id: "sentences", label: "Luyện câu" }
 ];
 
-export default function PracticeStudioView({ lesson, aiEnabled = true, onBack, onFinishExercise }) {
+export default function PracticeStudioView({ lesson, aiEnabled = true, childId, onBack, onFinishExercise }) {
   const [stage, setStage] = useState("words");
 
   const go = (id) => {
@@ -34,7 +34,7 @@ export default function PracticeStudioView({ lesson, aiEnabled = true, onBack, o
         <Tabs tabs={STAGES} value={stage} onChange={go} />
       </div>
 
-      {stage === "words" && <WordPractice lesson={lesson} aiEnabled={aiEnabled} onFinishExercise={onFinishExercise} />}
+      {stage === "words" && <WordPractice lesson={lesson} aiEnabled={aiEnabled} childId={childId} onFinishExercise={onFinishExercise} />}
       {stage === "warmup" && <WarmupStage lesson={lesson} onNext={() => go("discriminate")} />}
       {stage === "discriminate" && <DiscriminateStage lesson={lesson} onNext={() => go("mouth")} />}
       {stage === "mouth" && <MouthStage lesson={lesson} onNext={() => go("syllables")} />}

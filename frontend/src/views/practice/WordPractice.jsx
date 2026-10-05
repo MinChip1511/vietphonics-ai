@@ -27,7 +27,7 @@ function focusSyllable(word) {
   return parts[parts.length - 1];
 }
 
-export default function WordPractice({ lesson, aiEnabled = true, onFinishExercise }) {
+export default function WordPractice({ lesson, aiEnabled = true, childId, onFinishExercise }) {
   const words = lesson?.words || [];
   const [index, setIndex] = useState(0);
   const [step, setPhase] = useState("intro");
@@ -41,10 +41,11 @@ export default function WordPractice({ lesson, aiEnabled = true, onFinishExercis
     setNotice(null);
     let result;
     try {
-      result = await submitAudioAnalysis(blob, word.canonical, word.word);
+      result = await submitAudioAnalysis(blob, { childId, lessonId: lesson.id, wordId: word.id });
     } catch (err) {
       console.warn("Chấm điểm thất bại:", err);
-      setNotice({ tone: "error", headline: "Cá Xanh chưa chấm được lần này", instruction: "Con thử đọc lại một lần nữa nhé. Nếu vẫn vậy, nhờ ba mẹ kiểm tra kết nối." });
+      // The server's own sentence (busy, starting up, analysis switched off by the parent...) is child-safe.
+      setNotice({ tone: "error", headline: "Cá Xanh chưa chấm được lần này", instruction: err.message || "Con thử đọc lại một lần nữa nhé." });
       setPhase("ready");
       return;
     }

@@ -28,9 +28,10 @@ class AuthError(Exception):
         self.status = status
 
 
-def public_account(row) -> dict:
-    """The account as the client may see it (never the hash)."""
-    kids = [c["_id"] for c in col("children").find({"parent_id": row["id"]}, {"_id": 1}).sort("created_at", 1)]
+def public_account(row, kids=None) -> dict:
+    """The account as the client may see it (never the hash). `kids` saves a query when listing many."""
+    if kids is None:
+        kids = [c["_id"] for c in col("children").find({"parent_id": row["id"]}, {"_id": 1}).sort("created_at", 1)]
     return {
         "id": row["id"],
         "role": row["role"],
@@ -160,8 +161,8 @@ def reset_password(identifier, code, new_password):
     row = find_by_email(ident) if "@" in ident else find_by_phone(ident)
     if not row:
         raise AuthError("Không tìm thấy tài khoản với thông tin này.", 404)
+    check_password(new_password)  # first: a weak password must not burn the one-time code
     check_otp(row["phone"], code)
-    check_password(new_password)
     set_password(row["id"], new_password, must_change=False)
     return _open_session(get_account(row["id"]), True)
 
@@ -188,7 +189,10 @@ def change_password(account, current_password, new_password):
 # ---- admin operations ----------------------------------------------------------------------------
 
 def list_accounts():
-    return [public_account(r) for r in clean_all(col("accounts").find().sort("created_at", -1))]
+    kids = {}
+    for child in col("children").find({}, {"parent_id": 1}).sort("created_at", 1):
+        kids.setdefault(child.get("parent_id"), []).append(child["_id"])
+    return [public_account(r, kids.get(r["id"], [])) for r in clean_all(col("accounts").find().sort("created_at", -1))]
 
 
 def set_status(account_id, status):

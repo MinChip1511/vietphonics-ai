@@ -67,17 +67,21 @@ def _accounts_with_children():
     return result, [c for c in children if not c["parent_id"]]
 
 
-def _day_total(field_filter, day):
-    pipeline = [
-        {"$match": {**field_filter, "created_at": {"$regex": f"^{day}"}}},
-        {"$group": {"_id": None, "total": {"$sum": "$amount"}}},
-    ]
-    result = list(col("orders").aggregate(pipeline))
-    return result[0]["total"] if result else 0
+def _per_day(collection, match, value):
+    """{"2026-10-03": total} for the documents matching `match`, in ONE aggregation (not one query per day)."""
+    rows = col(collection).aggregate([
+        {"$match": match},
+        {"$group": {"_id": {"$substr": ["$created_at", 0, 10]}, "total": {"$sum": value}}},
+    ])
+    return {r["_id"]: r["total"] for r in rows}
+
+
+SOUND_SAMPLE = 5000  # the sound statistics use the latest attempts, so the cost does not grow with history
 
 
 def _metrics():
     now = utc_now()
+    first_day = (now - timedelta(days=6)).strftime("%Y-%m-%d")
     paid = list(col("orders").aggregate([{"$match": {"status": "paid"}}, {"$group": {"_id": None, "total": {"$sum": "$amount"}}}]))
     by_plan = [
         {"plan": d["_id"], "orders": d["orders"], "amount": d["amount"]}
@@ -87,25 +91,23 @@ def _metrics():
             {"$sort": {"amount": -1}},
         ])
     ]
-    child_names = {c["_id"]: c["name"] for c in col("children").find({}, {"name": 1})}
+    latest = list(col("practice_history").find().sort([("created_at", -1), ("_id", -1)]).limit(30))
+    names = {c["_id"]: c["name"] for c in col("children").find({"_id": {"$in": list({h["child_id"] for h in latest})}}, {"name": 1})}
     recent = [
-        {"score": h["score"], "word": h["word"], "created_at": h["created_at"], "child": child_names[h["child_id"]]}
-        for h in col("practice_history").find().sort([("created_at", -1), ("_id", -1)]).limit(30)
-        if h["child_id"] in child_names
+        {"score": h["score"], "word": h["word"], "created_at": h["created_at"], "child": names[h["child_id"]]}
+        for h in latest if h["child_id"] in names
     ][:6]
-    revenue_daily, attempts_daily = [], []
-    for back in range(6, -1, -1):
-        day = (now - timedelta(days=back)).strftime("%Y-%m-%d")
-        revenue_daily.append({"day": day, "amount": _day_total({"status": "paid"}, day)})
-        attempts_daily.append({"day": day, "count": col("practice_history").count_documents({"created_at": {"$regex": f"^{day}"}})})
+    revenue_by_day = _per_day("orders", {"status": "paid", "created_at": {"$gte": first_day}}, "$amount")
+    attempts_by_day = _per_day("practice_history", {"created_at": {"$gte": first_day}}, 1)
+    days = [(now - timedelta(days=back)).strftime("%Y-%m-%d") for back in range(6, -1, -1)]
     sounds = {"initial": [0, 0], "final": [0, 0], "tone": [0, 0]}
-    for h in col("practice_history").find({}, {"phones": 1}):
+    for h in col("practice_history").find({}, {"phones": 1}).sort("_id", -1).limit(SOUND_SAMPLE):
         for _token, category, ok in h.get("phones", []):
             if category in sounds:
                 sounds[category][1] += 1
                 sounds[category][0] += 1 if ok else 0
     return {
-        "attemptsDaily": attempts_daily,
+        "attemptsDaily": [{"day": d, "count": attempts_by_day.get(d, 0)} for d in days],
         "soundAccuracy": {k: (round(100 * c / t) if t else None) for k, (c, t) in sounds.items()},
         "parents": col("accounts").count_documents({"role": "parent"}),
         "children": col("children").count_documents({"parent_id": {"$ne": None}}),
@@ -115,7 +117,7 @@ def _metrics():
         "revenue": paid[0]["total"] if paid else 0,
         "paidParents": col("accounts").count_documents({"role": "parent", "plan": {"$ne": "free"}}),
         "revenueByPlan": by_plan,
-        "revenueDaily": revenue_daily,
+        "revenueDaily": [{"day": d, "amount": revenue_by_day.get(d, 0)} for d in days],
         "recentSubmissions": recent,
     }
 

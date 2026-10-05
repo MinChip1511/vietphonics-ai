@@ -134,11 +134,26 @@ def lesson_progress(history_rows, lessons):
     return progress
 
 
-def build_profile(row):
-    history = list(col("practice_history").find(
-        {"child_id": row["id"]}, {"lesson_id": 1, "word": 1, "score": 1, "phones": 1, "created_at": 1}
-    ).sort([("created_at", 1), ("_id", 1)]))
+def build_profiles(rows):
+    """Profiles for several children with ONE history query (listing families/admin must not query per child)."""
+    if not rows:
+        return []
     lessons = list_lessons(published_only=True)
+    history = defaultdict(list)
+    cursor = col("practice_history").find(
+        {"child_id": {"$in": [r["id"] for r in rows]}},
+        {"child_id": 1, "lesson_id": 1, "word": 1, "score": 1, "phones": 1, "created_at": 1},
+    ).sort([("created_at", 1), ("_id", 1)])
+    for h in cursor:
+        history[h["child_id"]].append(h)
+    return [_profile_from(r, history[r["id"]], lessons) for r in rows]
+
+
+def build_profile(row):
+    return build_profiles([row])[0]
+
+
+def _profile_from(row, history, lessons):
     progress = lesson_progress(history, lessons)
 
     recent = [h["score"] for h in history][-RECENT_ATTEMPTS:]
@@ -195,11 +210,11 @@ def get_owned_child(child_id, account):
 
 
 def list_children(account_id):
-    return [build_profile(r) for r in clean_all(col("children").find({"parent_id": account_id}).sort("created_at", 1))]
+    return build_profiles(clean_all(col("children").find({"parent_id": account_id}).sort("created_at", 1)))
 
 
 def all_children():
-    return [build_profile(r) for r in clean_all(col("children").find().sort("created_at", 1))]
+    return build_profiles(clean_all(col("children").find().sort("created_at", 1)))
 
 
 def get_profile(child_id, account):
@@ -259,8 +274,15 @@ def delete_child(child_id):
 
 # ---- practice -------------------------------------------------------------------------------------------
 
-def record_attempt(analysis, account_id):
-    """Stores the server-side result of an analysis so the score can be recorded without trusting the client."""
+def require_analysis_consent(child_row):
+    """The parent can switch AI analysis off per child: the server enforces it, not only the app."""
+    if not _settings(child_row)["consentAnalysis"]:
+        raise KidError("Phụ huynh đã tắt chấm điểm bằng AI cho hồ sơ này.", 403)
+
+
+def record_attempt(analysis, account_id, child_id, lesson_id, word_id=None):
+    """Stores the server-side result of an analysis so the score can be recorded without trusting the client.
+    The child and lesson are fixed here, when the word was analysed, not when the result is saved."""
     attempt_id = f"att-{uuid.uuid4().hex[:16]}"
     phones = [
         [r.get("canonical_token"), r.get("category"), bool(r.get("is_correct"))]
@@ -271,7 +293,8 @@ def record_attempt(analysis, account_id):
         for r in analysis.get("errors", [])
     ]
     col("analysis_attempts").insert_one({
-        "_id": attempt_id, "account_id": account_id, "word": analysis.get("target_word", ""),
+        "_id": attempt_id, "account_id": account_id, "child_id": child_id, "lesson_id": lesson_id, "word_id": word_id,
+        "word": analysis.get("target_word", ""),
         "canonical": " ".join(analysis.get("canonical", [])), "score": int(analysis.get("score", 0)),
         "phones": phones, "errors": errors, "consumed": False, "created_at": now_iso(),
     })
@@ -279,10 +302,10 @@ def record_attempt(analysis, account_id):
     return attempt_id
 
 
-def record_practice(account, child_id, attempt_id, lesson_id):
+def record_practice(account, child_id, attempt_id):
     """Saves a scored attempt for the child (once) and awards points when it reached the pass mark."""
     get_owned_child(child_id, account)  # 404 unless the child belongs to this account
-    attempt = col("analysis_attempts").find_one({"_id": attempt_id, "account_id": account["id"]})
+    attempt = col("analysis_attempts").find_one({"_id": attempt_id, "account_id": account["id"], "child_id": child_id})
     if not attempt:
         raise KidError("Không tìm thấy kết quả chấm điểm này", 404)
     # The atomic flip decides who records it when two requests carry the same attempt.
@@ -295,7 +318,7 @@ def record_practice(account, child_id, attempt_id, lesson_id):
     passed = score >= PASS_SCORE
     col("practice_history").insert_one({
         "child_id": child_id, "word": claimed["word"], "canonical": claimed["canonical"], "score": score,
-        "is_correct": passed, "errors": claimed["errors"], "lesson_id": lesson_id,
+        "is_correct": passed, "errors": claimed["errors"], "lesson_id": claimed.get("lesson_id"),
         "phones": claimed["phones"], "created_at": now_iso(),
     })
     awarded = STARS_PER_PASS if passed else 0

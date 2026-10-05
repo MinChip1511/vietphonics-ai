@@ -1,19 +1,17 @@
 // Calls used by the learning screens. Account, admin and store state live in services/store.jsx.
 import { api, ApiError } from "./apiClient";
 
-export async function fetchLessons() {
-  return api("/lessons");
-}
-
 // The AI backend is the only source of a score: there is no client-side simulation. When it cannot
 // answer, the caller gets an error and the child is asked to try again.
 export class AnalysisUnavailableError extends Error {}
 
-export async function submitAudioAnalysis(audioBlob, canonical, targetWord = "") {
+// The server looks up the word and its phonemes from the lesson: the app only says which word was read.
+export async function submitAudioAnalysis(audioBlob, { childId, lessonId, wordId }) {
   const form = new FormData();
   form.append("audio", audioBlob, "recording.wav");
-  form.append("canonical", canonical);
-  form.append("target_word", targetWord);
+  form.append("child_id", childId);
+  form.append("lesson_id", lessonId);
+  form.append("word_id", wordId);
   try {
     return (await api("/analyze-audio", { method: "POST", form })).data;
   } catch (err) {
@@ -23,8 +21,8 @@ export async function submitAudioAnalysis(audioBlob, canonical, targetWord = "")
 }
 
 // The score comes from the server by attempt id: the browser cannot send its own score.
-export async function recordPracticeSession(childId, attemptId, lessonId) {
-  return api("/record-practice", { method: "POST", body: { child_id: childId, attempt_id: attemptId, lesson_id: lessonId } });
+export async function recordPracticeSession(childId, attemptId) {
+  return api("/record-practice", { method: "POST", body: { child_id: childId, attempt_id: attemptId } });
 }
 
 export async function fetchPracticeHistory(childId, limit = 15) {

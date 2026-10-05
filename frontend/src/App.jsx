@@ -173,7 +173,7 @@ export default function App() {
     });
     // The server holds the score (by attempt id) and decides whether points are awarded.
     if (!result.attempt_id) return;
-    recordPracticeSession(childId, result.attempt_id, currentLesson?.id)
+    recordPracticeSession(childId, result.attempt_id)
       .then((saved) => {
         store.applyChild(saved.updated_child);
         setAiModalState((prev) => (prev.result === result ? { ...prev, awarded: saved.stars_awarded } : prev));
@@ -231,6 +231,7 @@ export default function App() {
                 key={currentLesson?.id}
                 lesson={currentLesson}
                 aiEnabled={aiEnabled}
+                childId={selectedChild?.id}
                 onBack={() => navigate("kid_dashboard")}
                 onFinishExercise={handleOpenExerciseResult}
               />

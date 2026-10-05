@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends
 from pydantic import BaseModel
 
 from .. import accounts
+from ..ratelimit import limit_by_ip
 from ..security import current_account, revoke_session, token_from_header
 
 router = APIRouter(prefix="/api/auth", tags=["auth"])
@@ -48,31 +49,31 @@ def _session(token, row):
     return {"token": token, "user": accounts.public_account(row)}
 
 
-@router.post("/register", status_code=201)
+@router.post("/register", status_code=201, dependencies=[limit_by_ip("register", 20, 3600)])
 def register(body: RegisterBody):
     row = accounts.create_account(name=body.name, email=body.email, phone=body.phone, password=body.password)
     token, row = accounts.login_with_password(row["email"], body.password)
     return _session(token, row)
 
 
-@router.post("/login")
+@router.post("/login", dependencies=[limit_by_ip("login", 60, 600)])
 def login(body: LoginBody):
     token, row = accounts.login_with_password(body.email, body.password, body.remember)
     return _session(token, row)
 
 
-@router.post("/otp/send")
+@router.post("/otp/send", dependencies=[limit_by_ip("otp", 10, 600)])
 def otp_send(body: OtpSendBody):
     return accounts.send_otp(body.phone)
 
 
-@router.post("/otp/login")
+@router.post("/otp/login", dependencies=[limit_by_ip("otp", 10, 600)])
 def otp_login(body: OtpLoginBody):
     token, row = accounts.login_with_otp(body.phone, body.code, body.remember)
     return _session(token, row)
 
 
-@router.post("/password/reset")
+@router.post("/password/reset", dependencies=[limit_by_ip("otp", 10, 600)])
 def password_reset(body: ResetBody):
     token, row = accounts.reset_password(body.identifier, body.code, body.new_password)
     return _session(token, row)
@@ -96,7 +97,7 @@ def logout(token: Optional[str] = Depends(token_from_header)):
     return {"status": "ok"}
 
 
-@router.get("/availability")
+@router.get("/availability", dependencies=[limit_by_ip("availability", 120, 60)])
 def availability(email: Optional[str] = None, phone: Optional[str] = None):
     """Lets the sign-up form say early that an email or phone is taken (this reveals nothing the
     register endpoint would not reveal anyway)."""

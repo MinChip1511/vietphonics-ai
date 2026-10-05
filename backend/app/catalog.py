@@ -10,6 +10,7 @@ from .database import clean, clean_all, col, now_iso
 from .lessons_data import CATEGORIES
 
 LESSON_STATUSES = ("draft", "published", "archived")
+DIFFICULTIES = ("Dễ", "Trung bình", "Thử thách")
 REWARD_KINDS = ("Mascot Outfit", "Visual Sticker", "Huy hiệu")
 _ID = re.compile(r"^[a-z0-9][a-z0-9-]{1,40}$")
 
@@ -102,6 +103,15 @@ def save_lesson(payload, lesson_id=None, known_phones=None):
     title = str(payload.get("title") or "").strip()
     if not title:
         raise CatalogError("Vui lòng nhập tiêu đề bài học.")
+    if len(title) > 120:
+        raise CatalogError("Tiêu đề tối đa 120 ký tự.")
+    description = str(payload.get("description", "") or "")
+    if len(description) > 300:
+        raise CatalogError("Mô tả tối đa 300 ký tự.")
+    difficulty = payload.get("difficulty") or "Dễ"
+    if difficulty not in DIFFICULTIES:
+        raise CatalogError("Độ khó không hợp lệ.")
+    icon = str(payload.get("icon") or "")[:8]
     category = payload.get("category") or (existing or {}).get("category")
     if category not in {c["id"] for c in CATEGORIES if c["id"] != "all"}:
         raise CatalogError("Vui lòng chọn nhóm bài học.")
@@ -121,10 +131,10 @@ def save_lesson(payload, lesson_id=None, known_phones=None):
         "title": title,
         "category": category,
         "categoryName": data.get("categoryName") or category_name.split(":")[0],
-        "difficulty": payload.get("difficulty") or data.get("difficulty") or "Dễ",
-        "description": payload.get("description", data.get("description", "")),
+        "difficulty": difficulty if payload.get("difficulty") else data.get("difficulty") or difficulty,
+        "description": description if "description" in payload else data.get("description", ""),
         "duration": data.get("duration") or f"{max(3, len(words))} phút",
-        "icon": payload.get("icon") or data.get("icon") or "📘",
+        "icon": icon or data.get("icon") or "📘",
         "level": data.get("level", 1),
         "words": words,
     })

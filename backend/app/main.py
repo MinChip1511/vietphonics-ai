@@ -1,10 +1,12 @@
 import json
 import logging
 import threading
+import time
 from contextlib import asynccontextmanager
-from fastapi import Depends, FastAPI, File, UploadFile, Form, HTTPException, Request
+from fastapi import FastAPI, File, UploadFile, Form, HTTPException, Request
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from pymongo.errors import PyMongoError
 
 from .alignment import (
     needleman_wunsch,
@@ -17,13 +19,14 @@ from .alignment import (
 from .accounts import AuthError
 from .audio_quality import analyze_signal
 from . import config
-from .catalog import CatalogError
+from . import database
+from .catalog import CatalogError, get_lesson
 from .commerce import CommerceError
 from .database import init_db
 from .features import decode_audio_bytes, acoustic_81, nccf_pitch, resize_time
-from .kids import KidError, record_attempt
+from .kids import KidError, get_owned_child, record_attempt, require_analysis_consent
+from .ratelimit import limit_by_account
 from .routers import admin as admin_router, auth as auth_router, content as content_router, profiles as profiles_router
-from .security import current_account
 from .validation import ValidationError
 from .verification import mark_unsure_phones, phone_confidences, cap_score_for_transcript, transcript_matches, is_off_target
 
@@ -177,7 +180,8 @@ def analyze_audio_neural(audio_bytes, canonical_str, target_word="", quality=Non
             asr_ids = AI_STATE["asr_head"](phonetic).argmax(-1)
         transcript = processor.batch_decode(asr_ids.unsqueeze(0))[0].strip()
         if is_off_target(transcript, target_word):
-            log.info("target=%r transcript=%r -> off_target (not scored)", target_word, transcript)
+            log.info("analysis not scored: off_target")
+            log.debug("target=%r transcript=%r", target_word, transcript)
             return not_scored_result("off_target", quality, transcript, f"papl_nccf_vietmdd_neural ({device})")
 
     frame_count = max(1, int(phonetic.shape[0]))
@@ -213,7 +217,8 @@ def analyze_audio_neural(audio_bytes, canonical_str, target_word="", quality=Non
     if quality and quality.get("warning"):
         capped = min(capped, SCORE_CAP_UNSURE)  # background noise: never the top band
     min_conf = f"{min(confidences):.2f}" if confidences else "n/a"
-    log.info("target=%r transcript=%r score=%s->%s min_conf=%s", target_word, transcript, score, capped, min_conf)
+    log.info("analysis scored: score=%s->%s min_conf=%s", score, capped, min_conf)
+    log.debug("target=%r transcript=%r", target_word, transcript)
     score = capped
     return {
         "scored": True,
@@ -233,18 +238,32 @@ def analyze_audio_neural(audio_bytes, canonical_str, target_word="", quality=Non
         "noise_warning": bool(quality and quality.get("warning")),
     }
 
-# Modern Starlette/FastAPI lifespan context manager
+def _connect_database():
+    """Connect to MongoDB and seed it, retrying forever: a database that is briefly unreachable must not
+    take the whole service down (/api/health shows `database: unavailable` meanwhile)."""
+    delay = 2
+    while True:
+        try:
+            init_db()
+            log.info("MongoDB ready")
+            return
+        except Exception:
+            log.exception("MongoDB not reachable, retrying in %ss", delay)
+            time.sleep(delay)
+            delay = min(delay * 2, 30)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-    init_db()
-    # The model takes a while to load: do it in the background so health checks answer straight away
-    # (/api/health reports model_loaded; /api/analyze-audio answers 503 until it is true).
+    # Both start in the background so the port opens at once and health checks answer while they warm up.
+    threading.Thread(target=_connect_database, name="db-connect", daemon=True).start()
     if config.MODEL_BACKGROUND_LOAD:
         threading.Thread(target=try_init_model, name="model-loader", daemon=True).start()
     else:
         try_init_model()
     yield
+
 
 app = FastAPI(
     title="VietPhonics AI Backend API",
@@ -265,6 +284,19 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def _wait_for_database(request: Request, call_next):
+    if not database.READY and request.url.path.startswith("/api") and request.url.path != "/api/health":
+        return JSONResponse(status_code=503, content={"detail": "Hệ thống đang khởi động, vui lòng thử lại sau ít giây."})
+    return await call_next(request)
+
+
+@app.exception_handler(PyMongoError)
+async def _database_error(_: Request, exc: PyMongoError):
+    log.error("Database error: %s", exc)
+    return JSONResponse(status_code=503, content={"detail": "Cơ sở dữ liệu tạm thời không kết nối được. Vui lòng thử lại."})
+
 
 @app.exception_handler(AuthError)
 async def _auth_error(_: Request, exc: AuthError):
@@ -296,7 +328,8 @@ app.include_router(admin_router.router)
 @app.get("/api/health")
 def health_check():
     return {
-        "status": "healthy",
+        "status": "healthy" if database.READY else "degraded",
+        "database": "ok" if database.READY else "unavailable",
         "service": "VietPhonics AI Backend",
         "model_loaded": AI_STATE["model_loaded"],
         "device": AI_STATE["device"],
@@ -305,21 +338,38 @@ def health_check():
     }
 
 
+# One request at a time by default: the model is CPU-bound, and two at once would only double the memory peak.
+_ANALYZE_SLOTS = threading.BoundedSemaphore(config.ANALYZE_CONCURRENCY)
+
+
 @app.post("/api/analyze-audio")
-async def analyze_audio(
+def analyze_audio(
     audio: UploadFile = File(...),
-    canonical: str = Form(...),
-    target_word: str = Form(""),
-    engine_mode: str = Form("auto"),
-    account: dict = Depends(current_account),
+    child_id: str = Form(...),
+    lesson_id: str = Form(...),
+    word_id: str = Form(...),
+    account: dict = limit_by_account("analyze", 30, 60),
 ):
     """
-    Receives recorded speech audio from browser (standardized 16kHz mono WAV),
-    performs phoneme alignment and diagnosis, returns score and ELSA feedback.
-    A scored result also gets an `attempt_id`: /api/record-practice takes the score from the server by
-    that id, so a client cannot invent a score.
+    Receives recorded speech audio from browser (standardized 16kHz mono WAV) for one word of a lesson and
+    returns the score and phoneme feedback. This is a plain `def`: FastAPI runs it in a worker thread, so a
+    slow analysis never blocks other requests (health checks included).
+
+    The server decides what the child should have said: the word and its phonemes come from the lesson, never
+    from the client. A scored result carries an `attempt_id`; /api/record-practice takes the score from the
+    server by that id, so a client cannot invent a score or credit another lesson.
     """
-    audio_bytes = await audio.read()
+    child = get_owned_child(child_id, account)
+    require_analysis_consent(child)
+    lesson = get_lesson(lesson_id, published_only=True)
+    word = next((w for w in (lesson or {}).get("words", []) if w["id"] == word_id), None)
+    if not word:
+        raise HTTPException(status_code=404, detail="Không tìm thấy từ này trong bài học")
+    canonical, target_word = word["canonical"], word["word"]
+
+    audio_bytes = audio.file.read(config.MAX_AUDIO_BYTES + 1)
+    if len(audio_bytes) > config.MAX_AUDIO_BYTES:
+        raise HTTPException(status_code=413, detail="Bản ghi quá dài, con đọc ngắn hơn nhé")
 
     # Silence and loud noise are rejected before any model runs (the model would still produce a score).
     quality = None
@@ -329,13 +379,15 @@ async def analyze_audio(
     except Exception as exc:
         log.warning("Audio quality check skipped: %s", exc)
     if quality and quality["status"] != "ok":
-        log.info("target=%r not scored: %s", target_word, quality)
+        log.info("analysis not scored: %s", quality["status"])
         kind = "no_speech" if quality["status"] == "silent" else "noisy"
         return {"status": "success", "data": not_scored_result(kind, quality)}
 
     # No simulated scores: if the model cannot run, say so instead of inventing a result.
-    if not (AI_STATE["model_loaded"] and engine_mode in {"auto", "live"}):
+    if not AI_STATE["model_loaded"]:
         raise HTTPException(status_code=503, detail="Cá Xanh đang khởi động, con thử lại sau ít phút nhé")
+    if not _ANALYZE_SLOTS.acquire(timeout=config.ANALYZE_WAIT_SECONDS):
+        raise HTTPException(status_code=503, detail="Cá Xanh đang bận nghe bạn khác, con thử lại sau ít giây nhé")
     try:
         res = analyze_audio_neural(audio_bytes, canonical, target_word, quality)
     except ValueError as exc:
@@ -343,8 +395,10 @@ async def analyze_audio(
     except Exception:
         log.exception("Neural inference failed")
         raise HTTPException(status_code=503, detail="Không chấm được bản ghi này")
+    finally:
+        _ANALYZE_SLOTS.release()
 
     if res.get("scored"):
         res["target_word"] = target_word
-        res["attempt_id"] = record_attempt(res, account["id"])
+        res["attempt_id"] = record_attempt(res, account["id"], child_id, lesson_id, word_id)
     return {"status": "success", "data": res}

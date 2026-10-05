@@ -14,8 +14,10 @@ def _env(name, default=None):
     return value if value not in (None, "") else default
 
 
-ENV = _env("VIETPHONICS_ENV", "development").lower()
-PRODUCTION = ENV == "production"
+# Fail closed: anything but an explicit "development" (or "test") is production, so a deployment that forgets
+# to set the variable never gets demo accounts, a fixed OTP or open CORS.
+ENV = _env("VIETPHONICS_ENV", "production").lower()
+PRODUCTION = ENV not in ("development", "dev", "test")
 
 # MongoDB (Atlas "mongodb+srv://..." in production). "mongomock://" is an in-memory database for tests and
 # quick local runs; it is refused in production. The default only suits a local mongod.
@@ -35,6 +37,11 @@ DEMO_OTP = _env("VIETPHONICS_DEMO_OTP", None if PRODUCTION else "123456")
 # Browsers on another origin than the API (e.g. Vercel calling Render directly) must be listed here.
 # With the Vercel "/api" rewrite (frontend/vercel.json) the browser stays same-origin and none is needed.
 CORS_ORIGINS = [o.strip() for o in (_env("VIETPHONICS_CORS", "" if PRODUCTION else "*")).split(",") if o.strip()]
+
+# Scoring limits: one 6-second WAV is ~200 KB; the model runs one request at a time by default.
+MAX_AUDIO_BYTES = int(_env("VIETPHONICS_MAX_AUDIO_BYTES", 1_000_000))
+ANALYZE_CONCURRENCY = int(_env("VIETPHONICS_ANALYZE_CONCURRENCY", 1))
+ANALYZE_WAIT_SECONDS = float(_env("VIETPHONICS_ANALYZE_WAIT", 20))
 
 # Load the model in a background thread so the server answers health checks while it warms up.
 MODEL_BACKGROUND_LOAD = _env("VIETPHONICS_MODEL_BACKGROUND", "1") == "1"

@@ -49,6 +49,12 @@ def register(n):
     return r.json()["token"], r.json()["user"]
 
 
+def attempt_for(account_id, child_id, score, lesson_id="lesson-0", word_id="lesson-0-w1"):
+    """What /api/analyze-audio stores for a scored word (the model itself is not needed here)."""
+    analysis = {"score": score, "elsa_rows": [], "errors": [], "canonical": ["b", "a", "_1"], "target_word": "Ba"}
+    return record_attempt(analysis, account_id, child_id, lesson_id, word_id)
+
+
 PARENT = ("phuhuynh@vietphonics.vn", "123456")
 ADMIN = ("admin@vietphonics.vn", "admin123")
 
@@ -161,11 +167,11 @@ def points_only_for_passing_words_and_replay_is_blocked_M2():
     tok, user = login(*PARENT)
     h = auth(tok)
     before = client.get("/api/profiles/child-an", headers=h).json()["stars"]
-    fail = record_attempt({"score": 40, "elsa_rows": [], "errors": [], "canonical": ["b", "a", "_1"], "target_word": "Ba"}, user["id"])
-    r = client.post("/api/record-practice", headers=h, json={"child_id": "child-an", "attempt_id": fail, "lesson_id": "lesson-0"})
+    fail = attempt_for(user["id"], "child-an", 40)
+    r = client.post("/api/record-practice", headers=h, json={"child_id": "child-an", "attempt_id": fail})
     assert r.json()["stars_awarded"] == 0 and r.json()["updated_child"]["stars"] == before
-    ok = record_attempt({"score": 90, "elsa_rows": [], "errors": [], "canonical": ["b", "a", "_1"], "target_word": "Ba"}, user["id"])
-    r = client.post("/api/record-practice", headers=h, json={"child_id": "child-an", "attempt_id": ok, "lesson_id": "lesson-0"})
+    ok = attempt_for(user["id"], "child-an", 90)
+    r = client.post("/api/record-practice", headers=h, json={"child_id": "child-an", "attempt_id": ok})
     assert r.json()["stars_awarded"] == 15 and r.json()["updated_child"]["stars"] == before + 15
     assert client.post("/api/record-practice", headers=h, json={"child_id": "child-an", "attempt_id": ok}).status_code == 409
     assert client.post("/api/record-practice", headers=h, json={"child_id": "child-an", "attempt_id": "att-forged"}).status_code == 404
@@ -175,7 +181,7 @@ def points_only_for_passing_words_and_replay_is_blocked_M2():
 def attempt_of_another_account_cannot_be_recorded():
     ptok, puser = login(*PARENT)
     tok, _ = register(5)
-    attempt = record_attempt({"score": 99, "elsa_rows": [], "errors": [], "canonical": ["b", "a", "_1"], "target_word": "Ba"}, puser["id"])
+    attempt = attempt_for(puser["id"], "child-an", 99)
     cid = client.post("/api/profiles", headers=auth(tok), json={"name": "Bé Zô", "age": 5}).json()["id"]
     assert client.post("/api/record-practice", headers=auth(tok), json={"child_id": cid, "attempt_id": attempt}).status_code == 404
 
@@ -306,6 +312,124 @@ def bootstrap_has_everything_the_console_needs():
         assert key in data, key
     assert all("password" not in a and "password_hash" not in a for a in data["accounts"])
     assert any(a["kids"] for a in data["accounts"])
+
+
+def silent_wav(seconds=1):
+    import io
+    import wave
+
+    buf = io.BytesIO()
+    with wave.open(buf, "wb") as w:
+        w.setnchannels(1); w.setsampwidth(2); w.setframerate(16000)
+        w.writeframes(b"\0\0" * 16000 * seconds)
+    return buf.getvalue()
+
+
+def analyze(token, audio_bytes=None, **fields):
+    data = {"child_id": "child-an", "lesson_id": "lesson-0", "word_id": "lesson-0-w1", **fields}
+    return client.post("/api/analyze-audio", headers=auth(token),
+                       files={"audio": ("a.wav", audio_bytes or silent_wav(), "audio/wav")}, data=data)
+
+
+@case
+def the_server_decides_what_the_child_should_say():
+    tok, _ = login(*PARENT)
+    assert analyze(tok, word_id="nope").status_code == 404                       # unknown word
+    assert analyze(tok, lesson_id="nope").status_code == 404                     # unknown lesson
+    assert analyze(tok, child_id="child-someone-else").status_code == 404        # not the caller's child
+    r = analyze(tok)
+    assert r.status_code == 200 and r.json()["data"]["result_type"] == "no_speech"   # silence is never scored
+    # a client-supplied canonical/target_word is ignored: the endpoint only takes ids
+    r = client.post("/api/analyze-audio", headers=auth(tok), files={"audio": ("a.wav", silent_wav(), "audio/wav")},
+                    data={"child_id": "child-an", "lesson_id": "lesson-0", "word_id": "lesson-0-w1", "canonical": "x x x", "target_word": "hack"})
+    assert r.status_code == 200
+
+
+@case
+def parent_can_switch_ai_analysis_off_and_the_server_obeys():
+    tok, _ = login(*PARENT)
+    h = auth(tok)
+    client.patch("/api/profiles/child-an", headers=h, json={"settings": {"consentAnalysis": False}})
+    r = analyze(tok)
+    assert r.status_code == 403 and "tắt" in r.json()["detail"], r.text
+    client.patch("/api/profiles/child-an", headers=h, json={"settings": {"consentAnalysis": True}})
+    assert analyze(tok).status_code == 200
+
+
+@case
+def oversized_audio_is_refused():
+    tok, _ = login(*PARENT)
+    assert analyze(tok, audio_bytes=b"0" * 1_100_000).status_code == 413
+
+
+@case
+def an_attempt_is_bound_to_its_child_and_lesson():
+    tok, user = login(*PARENT)
+    h = auth(tok)
+    attempt = attempt_for(user["id"], "child-an", 90, lesson_id="lesson-s-x", word_id="lesson-s-x-w1")
+    # recording it for another child of the same parent is refused...
+    assert client.post("/api/record-practice", headers=h, json={"child_id": "child-minh", "attempt_id": attempt}).status_code == 404
+    # ...and the history shows the lesson the word was analysed in, not one named by the client.
+    assert client.post("/api/record-practice", headers=h, json={"child_id": "child-an", "attempt_id": attempt, "lesson_id": "lesson-0"}).status_code == 200
+    latest = client.get("/api/practice-history?child_id=child-an&limit=1", headers=h).json()["history"][0]
+    assert latest["lesson_id"] == "lesson-s-x"
+
+
+@case
+def rate_limits_stop_floods():
+    from backend.app.ratelimit import LIMITERS
+
+    tok, _ = login(*PARENT)
+    limiter = LIMITERS["analyze"]
+    old = limiter.max_calls
+    limiter._hits.clear(); limiter.max_calls = 2
+    try:
+        assert analyze(tok).status_code == 200 and analyze(tok).status_code == 200
+        assert analyze(tok).status_code == 429
+    finally:
+        limiter.max_calls = old
+        limiter._hits.clear()
+    reg = LIMITERS["register"]
+    old = reg.max_calls
+    reg._hits.clear(); reg.max_calls = 1
+    try:
+        client.post("/api/auth/register", json={"name": "A B", "email": "rl1@x.vn", "phone": "0877000001", "password": "Abcdefg1"})
+        assert client.post("/api/auth/register", json={"name": "A B", "email": "rl2@x.vn", "phone": "0877000002", "password": "Abcdefg1"}).status_code == 429
+    finally:
+        reg.max_calls = old
+        reg._hits.clear()
+
+
+@case
+def weak_new_password_does_not_burn_the_one_time_code():
+    assert client.post("/api/auth/otp/send", json={"phone": "0933444555"}).status_code == 200
+    r = client.post("/api/auth/password/reset", json={"identifier": "0933444555", "code": "123456", "new_password": "weak"})
+    assert r.status_code == 422
+    r = client.post("/api/auth/password/reset", json={"identifier": "0933444555", "code": "123456", "new_password": "Strong123x"})
+    assert r.status_code == 200, r.text
+
+
+@case
+def api_waits_politely_while_the_database_is_not_ready():
+    from backend.app import database
+
+    database.READY = False
+    try:
+        assert client.get("/api/lessons").status_code == 503
+        health = client.get("/api/health")
+        assert health.status_code == 200 and health.json()["database"] == "unavailable"
+    finally:
+        database.READY = True
+
+
+@case
+def lesson_text_fields_are_bounded():
+    atok, _ = login(*ADMIN)
+    h = auth(atok)
+    base = {"title": "T", "category": "initial_consonants", "status": "draft", "words": [{"word": "Sao", "canonical": "S a w _1"}]}
+    assert client.post("/api/admin/lessons", headers=h, json={**base, "title": "x" * 121}).status_code == 422
+    assert client.post("/api/admin/lessons", headers=h, json={**base, "description": "x" * 301}).status_code == 422
+    assert client.post("/api/admin/lessons", headers=h, json={**base, "difficulty": "Siêu khó"}).status_code == 422
 
 
 if __name__ == "__main__":

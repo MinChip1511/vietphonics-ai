@@ -14,7 +14,6 @@ router = APIRouter(prefix="/api", tags=["profiles"])
 
 
 class CreateChildBody(BaseModel):
-    id: Optional[str] = None
     name: str
     age: int
     avatar: str = "mascot:ca-voi"
@@ -32,7 +31,6 @@ class UpdateChildBody(BaseModel):
 class RecordBody(BaseModel):
     child_id: str
     attempt_id: str
-    lesson_id: Optional[str] = None
 
 
 class RedeemBody(BaseModel):
@@ -69,7 +67,7 @@ def delete_profile(child_id: str, account: dict = Depends(current_account)):
 
 @router.post("/record-practice")
 def record_practice(body: RecordBody, account: dict = Depends(current_account)):
-    child, awarded = kids.record_practice(account, body.child_id, body.attempt_id, body.lesson_id)
+    child, awarded = kids.record_practice(account, body.child_id, body.attempt_id)
     return {"status": "success", "updated_child": child, "stars_awarded": awarded}
 
 

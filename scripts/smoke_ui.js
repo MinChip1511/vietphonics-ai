@@ -90,19 +90,19 @@ const ADMIN_VIEWS = ['admin_dashboard', 'admin_lessons', 'admin_content', 'admin
     await page.click('[data-testid="continue-lesson"]');
     await page.waitForSelector('#btn-start-practice');
   });
-  await step('admin signs in', async () => {
+  if (process.env.VP_SKIP_ADMIN !== '1') await step('admin signs in', async () => {
     await page.evaluate(() => localStorage.clear());
     await page.goto(BASE);
     await login(ADMIN);
   });
-  for (const v of ADMIN_VIEWS) {
+  for (const v of process.env.VP_SKIP_ADMIN === '1' ? [] : ADMIN_VIEWS) {
     await step(`admin: ${v}`, async () => {
       await open(v);
       if (await page.locator('[data-testid="admin-loading"]').count()) throw new Error('stuck loading');
     });
   }
   // Opt-in: it briefly locks the first parent account, which must not happen on a live system.
-  if (process.env.VP_TEST_LOCK === '1') await step('admin can lock and unlock an account', async () => {
+  if (process.env.VP_TEST_LOCK === '1' && process.env.VP_SKIP_ADMIN !== '1') await step('admin can lock and unlock an account', async () => {
     await open('admin_users');
     await page.waitForSelector('[data-testid="toggle-lock"]');
     await page.click('[data-testid="toggle-lock"]');

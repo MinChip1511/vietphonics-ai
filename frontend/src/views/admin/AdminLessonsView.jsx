@@ -8,7 +8,7 @@ import { useToast, runAdmin, selectClass } from "./adminUtils";
 
 // Figma: 07 Admin / 02 / admin-lessons (20:218). These are the real lessons children practise with:
 // "Đã xuất bản" lessons appear in the child's app, drafts and archived ones do not.
-const DIFFICULTIES = ["Dễ", "Trung bình", "Khó"];
+const DIFFICULTIES = ["Dễ", "Trung bình", "Thử thách"];
 const emptyWord = () => ({ word: "", canonical: "", guide: "" });
 
 function LessonEditor({ lesson, isNew, categories, phones, onSave, onDelete, onCancel }) {

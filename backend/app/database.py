@@ -10,6 +10,7 @@ from . import config
 
 _client = None
 _database = None
+READY = False  # set by init_db() once the connection works and the schema/seed data exist
 
 
 def utc_now() -> datetime:
@@ -78,7 +79,9 @@ def init_indexes():
 
 def init_db():
     """Create indexes, then seed reference data and (outside production) demo accounts."""
+    global READY
     init_indexes()
     from .seed import seed_all  # imported here: seed builds on the modules that use this one
 
     seed_all()
+    READY = True
