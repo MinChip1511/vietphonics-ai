@@ -3,8 +3,9 @@ import { Plus, Trash2 } from "lucide-react";
 import { Card, Field, Modal, Button, inputClass } from "../../components/ui";
 import { useStore } from "../../services/store";
 import { LESSON_STATUS } from "../../data/adminLabels";
-import { AdminHeader, AdminLoading, StatusBadge, Toast } from "./adminUi";
-import { useToast, runAdmin, selectClass } from "./adminUtils";
+import { AdminHeader, AdminLoading, StatusBadge, Toast, TABLE_WRAP, TABLE, THEAD, TH, TR, TD, CHIP_SELECT, PANEL_TITLE } from "./adminUi";
+import { useToast, runAdmin } from "./adminUtils";
+import { timeAgo } from "../parent/parentUtils";
 
 // Figma: 07 Admin / 02 / admin-lessons (20:218). These are the real lessons children practise with:
 // "Đã xuất bản" lessons appear in the child's app, drafts and archived ones do not.
@@ -29,9 +30,9 @@ function LessonEditor({ lesson, isNew, categories, phones, onSave, onDelete, onC
   };
 
   return (
-    <Card className="p-5 flex flex-col gap-4" data-testid="lesson-editor">
+    <Card flat className="p-6 flex flex-col gap-4" data-testid="lesson-editor">
       <div className="flex items-center justify-between">
-        <p className="font-bold text-vp-ink">{isNew ? "Tạo bài học mới" : "Chi tiết bài học"}</p>
+        <p className={PANEL_TITLE}>{isNew ? "Tạo bài học mới" : `Chi tiết bài học (${lesson.id})`}</p>
         <span className="rounded-md bg-vp-sky px-2 py-0.5 text-[11px] font-bold text-vp-blue">Chế độ chỉnh sửa</span>
       </div>
       <Field label="Tiêu đề bài học (tiếng Việt)">
@@ -67,9 +68,9 @@ function LessonEditor({ lesson, isNew, categories, phones, onSave, onDelete, onC
 
       {error && <p data-testid="lesson-error" className="text-sm font-semibold text-red-500">{error}</p>}
       <div className="flex flex-wrap gap-2">
-        <button data-testid="lesson-publish" disabled={busy} onClick={() => save("published")} className="flex-1 h-11 rounded-xl bg-vp-blue text-sm font-bold text-white disabled:opacity-60">{form.status === "published" ? "Cập nhật" : "Xuất bản"}</button>
-        <button disabled={busy} onClick={() => save("draft")} className="h-11 rounded-xl border border-vp-border px-4 text-sm font-semibold text-vp-ink">Lưu nháp</button>
-        <button onClick={onCancel} className="h-11 rounded-xl border border-vp-border px-4 text-sm text-vp-muted">Huỷ</button>
+        <button data-testid="lesson-publish" disabled={busy} onClick={() => save("published")} className="flex-1 rounded-lg bg-vp-blue px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">{form.status === "published" ? "Cập nhật" : "Xuất bản"}</button>
+        <button disabled={busy} onClick={() => save("draft")} className="rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] px-4 py-2.5 text-sm font-semibold text-[#475569]">Lưu nháp</button>
+        <button onClick={onCancel} className="rounded-lg border border-[#E2E8F0] px-4 py-2.5 text-sm text-[#475569]">Huỷ</button>
       </div>
       {!isNew && (
         <div className="flex gap-4">
@@ -80,6 +81,8 @@ function LessonEditor({ lesson, isNew, categories, phones, onSave, onDelete, onC
     </Card>
   );
 }
+
+const shortId = (id) => (String(id).length > 14 ? `${String(id).slice(0, 12)}…` : id);
 
 export default function AdminLessonsView() {
   const { admin, catalog } = useStore();
@@ -124,31 +127,32 @@ export default function AdminLessonsView() {
   return (
     <div className="max-w-[1200px]">
       <AdminHeader actionLabel="Tạo bài học mới" onAction={newLesson} />
-      <div className="grid gap-6 [&>*]:min-w-0 lg:grid-cols-[1.6fr_1fr] items-start">
-        <Card className="p-4 sm:p-5 flex flex-col gap-4">
+      <div className="grid gap-5 [&>*]:min-w-0 lg:grid-cols-[1fr_420px] items-start">
+        <Card flat className="p-6 flex flex-col gap-4">
           <div className="flex flex-wrap gap-2">
-            <select aria-label="Lọc nhóm" className={selectClass} value={category} onChange={(e) => setCategory(e.target.value)}>
+            <select aria-label="Lọc nhóm" className={CHIP_SELECT} value={category} onChange={(e) => setCategory(e.target.value)}>
               <option value="all">Tất cả nhóm</option>{categories.filter((c) => c.id !== "all").map((c) => <option key={c.id} value={c.id}>{categoryName(c.id)}</option>)}
             </select>
-            <select aria-label="Lọc trạng thái" className={selectClass} value={status} onChange={(e) => setStatus(e.target.value)}>
+            <select aria-label="Lọc trạng thái" className={CHIP_SELECT} value={status} onChange={(e) => setStatus(e.target.value)}>
               <option value="all">Mọi trạng thái</option>{Object.entries(LESSON_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
             </select>
-            <input data-testid="lesson-search" aria-label="Tìm kiếm bài học" className={`${selectClass} ml-auto w-full sm:w-52`} placeholder="Tìm kiếm bài học..." value={query} onChange={(e) => setQuery(e.target.value)} />
+            <input data-testid="lesson-search" aria-label="Tìm kiếm bài học" className={`${CHIP_SELECT} ml-auto w-full sm:w-52`} placeholder="Tìm kiếm bài học..." value={query} onChange={(e) => setQuery(e.target.value)} />
           </div>
-          <div className="overflow-x-auto rounded-xl border border-vp-border">
-            <table className="w-full min-w-[560px] text-sm">
-              <thead className="bg-vp-canvas/70 text-left text-xs text-vp-muted">
-                <tr><th className="px-4 py-3">Tên bài học</th><th className="px-4 py-3">Nhóm</th><th className="px-4 py-3">Độ khó</th><th className="px-4 py-3">Số từ</th><th className="px-4 py-3">Trạng thái</th></tr>
+          <div className={TABLE_WRAP}>
+            <table className={TABLE}>
+              <thead className={THEAD}>
+                <tr><th className={TH}>ID</th><th className={TH}>Tên bài học</th><th className={TH}>Nhóm</th><th className={TH}>Độ khó</th><th className={TH}>Số từ</th><th className={TH}>Trạng thái</th></tr>
               </thead>
               <tbody>
-                {rows.length === 0 && <tr><td colSpan={5} className="px-4 py-6 text-center text-vp-muted">Không tìm thấy bài học phù hợp.</td></tr>}
+                {rows.length === 0 && <tr><td colSpan={6} className="px-3 py-6 text-center text-vp-muted">Không tìm thấy bài học phù hợp.</td></tr>}
                 {rows.map((l) => (
-                  <tr key={l.id} data-testid={`lesson-row-${l.id}`} onClick={() => { setDraft(null); setSelectedId(l.id); }} className={`cursor-pointer border-t border-vp-border ${l.id === selectedId && !draft ? "bg-vp-sky/40" : "hover:bg-vp-canvas/60"}`}>
-                    <td className="px-4 py-3"><p className="font-bold text-vp-ink">{l.title}</p><p className="text-[11px] text-vp-muted">{l.id}</p></td>
-                    <td className="px-4 py-3 text-vp-ink">{categoryName(l.category)}</td>
-                    <td className="px-4 py-3 text-vp-ink whitespace-nowrap">{l.difficulty}</td>
-                    <td className="px-4 py-3 text-vp-ink whitespace-nowrap">{l.words.length} từ</td>
-                    <td className="px-4 py-3"><StatusBadge map={LESSON_STATUS} status={l.status} /></td>
+                  <tr key={l.id} data-testid={`lesson-row-${l.id}`} onClick={() => { setDraft(null); setSelectedId(l.id); }} className={`cursor-pointer ${TR} ${l.id === selectedId && !draft ? "bg-vp-sky/40" : "hover:bg-vp-canvas/60"}`}>
+                    <td className={`${TD} font-semibold text-[#1978DC] whitespace-nowrap`} title={l.id}>{shortId(l.id)}</td>
+                    <td className={TD}><p className="font-semibold text-[#0F172A]">{l.title}</p>{l.updated_at && <p className="text-[11px] text-[#94A3B8] whitespace-nowrap">Cập nhật mới nhất: {timeAgo(l.updated_at)}</p>}</td>
+                    <td className={`${TD} text-[#475569]`}>{categoryName(l.category)}</td>
+                    <td className={`${TD} text-[#475569] whitespace-nowrap`}>{l.difficulty}</td>
+                    <td className={`${TD} text-[#475569] whitespace-nowrap`}>{l.words.length} từ</td>
+                    <td className={TD}><StatusBadge map={LESSON_STATUS} status={l.status} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -160,7 +164,7 @@ export default function AdminLessonsView() {
         ) : selected ? (
           <LessonEditor key={selected.id + selected.updated_at} lesson={selected} categories={categories} phones={admin.data.phones} onSave={save} onDelete={() => setConfirmDelete(true)} onCancel={() => setSelectedId(null)} />
         ) : (
-          <Card className="p-5 text-sm text-vp-muted">Chọn một bài học để chỉnh sửa.</Card>
+          <Card flat className="p-6 text-sm text-vp-muted">Chọn một bài học để chỉnh sửa.</Card>
         )}
       </div>
       <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)} title={`Xóa bài học "${selected?.title}"?`}

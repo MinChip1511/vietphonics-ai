@@ -87,7 +87,7 @@ export default function MicCheckStep({ error, onBack, onFinish }) {
         <h1 className="font-heading text-3xl font-extrabold uppercase text-vp-ink">Kiểm tra micro của bé</h1>
         <p className="text-sm text-vp-muted max-w-2xl">Bước cuối: thử micro ngay bây giờ để lúc học bé không bị gián đoạn. Giọng nói chỉ dùng để chấm điểm và không được lưu trên máy chủ.</p>
       </div>
-      <div className="max-w-[640px] rounded-3xl bg-white p-6 sm:p-8 flex flex-col items-center gap-5 text-center shadow-[0_12px_32px_rgba(30,27,75,0.05)]">
+      <div className="max-w-[640px] rounded-[48px] bg-white p-6 sm:p-8 flex flex-col items-center gap-5 text-center shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-2px_rgba(0,0,0,0.1)]">
         <span className={`w-20 h-20 rounded-full bg-vp-sky grid place-items-center ${tone}`}><Icon className="w-9 h-9" /></span>
         <div role="status" data-testid={`mic-state-${state}`}>
           <p className={`font-heading text-xl font-extrabold ${tone}`}>{title}</p>
@@ -95,20 +95,20 @@ export default function MicCheckStep({ error, onBack, onFinish }) {
         </div>
         {state === "listening" && (
           <div className="w-full flex flex-col gap-2">
-            <div className="h-3 w-full rounded-full bg-[#EEF1FA] overflow-hidden"><div className="h-full rounded-full bg-vp-blue transition-[width] duration-100" style={{ width: `${Math.round(level * 100)}%` }} /></div>
+            <div className="h-3 w-full rounded-full bg-[#F1F3FC] overflow-hidden"><div className="h-full rounded-full bg-vp-blue transition-[width] duration-100" style={{ width: `${Math.round(level * 100)}%` }} /></div>
             <p className="text-xs text-vp-muted">Còn {seconds} giây…</p>
           </div>
         )}
         {(state === "idle" || retry) && (
-          <button data-testid="mic-start" type="button" onClick={start} className="h-12 rounded-full bg-vp-blue px-6 text-sm font-bold text-white">
+          <button data-testid="mic-start" type="button" onClick={start} className="h-14 rounded-full bg-vp-blue px-10 text-base font-bold text-white shadow-md">
             {retry ? "Thử lại" : "Bật micro & thử giọng"}
           </button>
         )}
         {error && <p className="w-full rounded-xl bg-red-50 px-4 py-2 text-sm font-semibold text-red-500">{error}</p>}
       </div>
       <div className="flex flex-wrap justify-between gap-3 max-w-[640px]">
-        <button type="button" onClick={onBack} className="h-12 rounded-full bg-[#EEF1FA] px-5 text-sm font-bold text-vp-ink flex items-center gap-2"><ArrowLeft className="w-4 h-4" /> Quay lại</button>
-        <button data-testid="su-finish" type="button" disabled={busy || state === "listening"} onClick={done} className="h-12 rounded-full bg-vp-blue px-6 text-sm font-bold text-white disabled:opacity-60">
+        <button type="button" onClick={onBack} className="h-14 rounded-full bg-[#EBEDF7] px-8 text-base font-bold text-[#181C22] flex items-center gap-2"><ArrowLeft className="w-4 h-4" /> Quay lại</button>
+        <button data-testid="su-finish" type="button" disabled={busy || state === "listening"} onClick={done} className="h-14 rounded-full bg-vp-blue px-10 text-base font-bold text-white shadow-md disabled:opacity-60">
           {state === "heard" ? "Hoàn Tất & Vào Học Thử Miễn Phí 🚀" : "Bỏ qua, hoàn tất đăng ký"}
         </button>
       </div>

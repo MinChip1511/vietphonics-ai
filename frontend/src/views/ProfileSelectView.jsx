@@ -42,11 +42,11 @@ export default function ProfileSelectView({ profiles, selectedChild, onSelectChi
         </p>
       </div>
 
-      <div className="w-full max-w-[400px] rounded-[32px] border-[3px] border-vp-sky bg-white p-8 flex flex-col items-center gap-6 shadow-[0_12px_16px_rgba(30,27,75,0.04)]">
-        <span className="w-[160px] h-[160px] rounded-full bg-vp-sky grid place-items-center overflow-hidden"><img src={MASCOT_IMAGE} alt="Cá Xanh" className="w-[92%] h-[92%] object-contain" /></span>
+      <div className="w-full max-w-[400px] h-[320px] rounded-[32px] border-[3px] border-vp-sky bg-white flex flex-col items-center justify-center gap-6 shadow-vp-lift">
+        <img src={MASCOT_IMAGE} alt="Cá Xanh" className="w-[212px] h-[212px] object-contain" />
         <button
           onClick={() => speakVietnamese(WELCOME_LINE)}
-          className="flex items-center gap-2 rounded-2xl bg-vp-sky px-5 py-2 text-[15px] font-bold text-vp-blue"
+          className="flex items-center gap-2 whitespace-nowrap rounded-2xl bg-vp-sky px-5 py-2 text-[15px] font-bold text-vp-blue"
         >
           <Volume2 className="w-5 h-5" /> "{WELCOME_LINE}"
         </button>
@@ -86,7 +86,7 @@ export default function ProfileSelectView({ profiles, selectedChild, onSelectChi
           data-testid="start-learning"
           disabled={!active}
           onClick={() => { playSoundEffect("click"); onSelectChild(active); }}
-          className="w-full max-w-[400px] flex items-center justify-center gap-3 rounded-[32px] bg-vp-blue px-16 py-5 font-heading text-[22px] font-extrabold text-white shadow-[0_8px_10px_rgba(25,120,220,0.25)] hover:brightness-110"
+          className="w-full max-w-[400px] flex items-center justify-center gap-3 rounded-[32px] bg-vp-blue px-16 py-5 font-heading text-[22px] leading-[35px] font-extrabold text-white shadow-vp-cta hover:brightness-110"
         >
           Bắt đầu học ngay <Play className="w-6 h-6" />
         </button>

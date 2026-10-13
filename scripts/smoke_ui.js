@@ -91,7 +91,7 @@ const ADMIN_VIEWS = ['admin_dashboard', 'admin_lessons', 'admin_content', 'admin
     await page.waitForSelector('#btn-start-practice');
   });
   if (process.env.VP_SKIP_ADMIN !== '1') await step('admin signs in', async () => {
-    await page.evaluate(() => localStorage.clear());
+    await page.evaluate(() => { localStorage.clear(); sessionStorage.clear(); }); // the sign-in token lives in sessionStorage unless 'remember' is ticked
     await page.goto(BASE);
     await login(ADMIN);
   });

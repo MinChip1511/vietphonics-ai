@@ -70,7 +70,7 @@ export default function KidProgressView({ selectedChild, onGoToLesson }) {
           <h3 className="font-heading text-xl font-bold text-vp-ink">Độ chính xác các tuần gần đây</h3>
           <div className="flex items-end gap-3 h-36">
             {weekly.map((v, i) => (
-              <div key={i} className="flex-1 flex flex-col items-center gap-1">
+              <div key={i} className="flex-1 h-full justify-end flex flex-col items-center gap-1">
                 <span className="text-xs font-bold text-vp-blue">{v}%</span>
                 <div className="w-full rounded-t-lg bg-vp-blue/80" style={{ height: `${v}%` }} />
                 <span className="text-[11px] text-vp-muted">T{i + 1}</span>

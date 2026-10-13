@@ -3,10 +3,13 @@ import { Download, Lock } from "lucide-react";
 import { Card, Modal, Button } from "../../components/ui";
 import { useStore } from "../../services/store";
 import { formatVnd } from "../../data/adminLabels";
-import { AdminHeader, AdminLoading } from "./adminUi";
+import { AdminHeader, AdminLoading, PANEL_TITLE } from "./adminUi";
 
 // Figma: 07 Admin / 08 / admin-revenue (20:1296). Everything is summed from the orders table.
-const dayLabel = (iso) => new Date(`${iso}T00:00:00`).toLocaleDateString("vi-VN", { weekday: "short" });
+const WEEKDAY = ["CN", "T2", "T3", "T4", "T5", "T6", "T7"];
+const dayLabel = (iso) => WEEKDAY[new Date(`${iso}T00:00:00`).getDay()];
+const shortDate = (iso) => `${iso.slice(8, 10)}/${iso.slice(5, 7)}`;
+const PLAN_COLORS = ["#1978DC", "#F97316", "#F59E0B", "#64748B"];
 
 export default function AdminRevenueView() {
   const { admin } = useStore();
@@ -22,7 +25,8 @@ export default function AdminRevenueView() {
   const todayTotal = sum(paid.filter((o) => o.created_at.startsWith(today)));
   const monthTotal = sum(paid.filter((o) => o.created_at.startsWith(month)));
   const avg = paid.length ? Math.round(sum(paid) / paid.length) : 0;
-  const maxDay = Math.max(1, ...metrics.revenueDaily.map((d) => d.amount));
+  const days = metrics.revenueDaily;
+  const maxDay = Math.max(1, ...days.map((d) => d.amount));
 
   const exportCsv = () => {
     const lines = ["ma_don,khach_hang,goi,so_tien,kenh,trang_thai,thoi_gian", ...orders.map((o) => [o.id, `"${o.customer}"`, `"${o.plan}"`, o.amount, o.method, o.status, o.created_at].join(","))];
@@ -39,45 +43,48 @@ export default function AdminRevenueView() {
   return (
     <div className="max-w-[1200px]">
       <AdminHeader
-        title="Báo cáo Doanh thu & Đối soát"
-        extra={<button data-testid="export-csv" onClick={exportCsv} className="flex items-center gap-1.5 rounded-full bg-vp-blue px-4 py-2 text-xs font-bold text-white"><Download className="w-4 h-4" /> Xuất file đối soát (.CSV)</button>}
+        extra={<button data-testid="export-csv" onClick={exportCsv} className="flex items-center gap-1.5 rounded-lg bg-vp-blue px-4 py-2.5 text-xs font-semibold text-white hover:brightness-110"><Download className="w-4 h-4" /> Xuất file đối soát (.CSV)</button>}
       />
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-6">
+      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4 mb-5">
         {kpis.map((k) => (
-          <Card key={k.label} className="p-5 rounded-2xl flex flex-col gap-2">
-            <p className="text-xs text-vp-muted">{k.label}</p>
-            <p data-testid={`rev-${k.label}`} className="font-heading text-2xl font-extrabold text-vp-ink">{k.value}</p>
-            <p className="text-[11px] text-vp-muted">{k.note}</p>
+          <Card flat key={k.label} className="p-5 flex flex-col gap-3">
+            <p className="text-[13px] font-semibold uppercase text-[#94A3B8]">{k.label}</p>
+            <p data-testid={`rev-${k.label}`} className="font-heading text-[28px] leading-tight font-bold text-[#0F172A]">{k.value}</p>
+            <p className="text-xs text-[#475569]">{k.note}</p>
           </Card>
         ))}
       </div>
-      <div className="grid gap-6 [&>*]:min-w-0 lg:grid-cols-[1.4fr_1fr] mb-6">
-        <Card className="p-5">
+      <div className="grid gap-5 [&>*]:min-w-0 lg:grid-cols-[1fr_420px] mb-5">
+        <Card flat className="p-6">
           <div className="flex flex-wrap items-center justify-between gap-2 mb-4">
-            <p className="font-bold text-vp-ink">Doanh thu 7 ngày qua (nghìn đồng)</p>
+            <p className={PANEL_TITLE}>Biểu đồ doanh thu 7 ngày qua{days.length ? ` (${shortDate(days[0].day)} - ${shortDate(days[days.length - 1].day)})` : ""}</p>
+            <span className="text-xs text-[#94A3B8]">Khoảng thời gian: 7 ngày qua</span>
           </div>
           <div className="flex items-end gap-3 sm:gap-6 h-44 px-2">
-            {metrics.revenueDaily.map((d) => (
+            {days.map((d) => (
               <div key={d.day} className="flex-1 flex flex-col items-center justify-end gap-1 h-full" title={`${d.day}: ${formatVnd(d.amount)}`}>
                 <span className="text-[10px] font-bold text-vp-muted">{Math.round(d.amount / 1000)}</span>
-                <div className="w-full max-w-9 rounded-t-md bg-vp-blue" style={{ height: `${(d.amount / maxDay) * 100}%`, minHeight: d.amount ? 4 : 0 }} />
+                <div className="w-6 rounded-t-md bg-vp-blue" style={{ height: `${(d.amount / maxDay) * 100}%`, minHeight: d.amount ? 4 : 0 }} />
                 <span className="text-xs text-vp-muted">{dayLabel(d.day)}</span>
               </div>
             ))}
           </div>
         </Card>
-        <Card className="p-5 flex flex-col gap-4">
-          <p className="font-bold text-vp-ink">Doanh thu theo gói học</p>
+        <Card flat className="p-6 flex flex-col gap-4">
+          <p className={PANEL_TITLE}>Doanh thu theo gói học</p>
           {metrics.revenueByPlan.length === 0 && <p className="text-sm text-vp-muted">Chưa có đơn nào được thanh toán.</p>}
-          {metrics.revenueByPlan.map((p) => (
+          {metrics.revenueByPlan.map((p, i) => (
             <div key={p.plan}>
-              <div className="flex justify-between text-sm"><span className="font-bold text-vp-ink">{p.plan}</span><span className="text-xs text-vp-muted">{p.orders} đơn</span></div>
-              <p className="font-bold text-vp-ink">{formatVnd(p.amount)}</p>
+              <div className="flex items-center justify-between gap-2">
+                <span className="flex items-center gap-2 text-[13px] font-semibold text-[#0F172A]"><span className="w-2.5 h-2.5 rounded-sm" style={{ background: PLAN_COLORS[i % PLAN_COLORS.length] }} />{p.plan}</span>
+                <span className="text-xs text-[#94A3B8]">{p.orders} đơn</span>
+              </div>
+              <p className="pl-[18px] font-bold text-[#0F172A]">{formatVnd(p.amount)}</p>
             </div>
           ))}
         </Card>
       </div>
-      <Card className="p-5 flex items-start gap-3">
+      <Card flat className="p-5 flex items-start gap-3">
         <Lock className="w-5 h-5 text-orange-500 shrink-0" />
         <div>
           <p className="font-bold text-vp-ink">Đối soát ngân hàng tự động <span className="ml-1 rounded-md bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-orange-500">PHASE 2</span></p>

@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Card, Modal, Button, Field, inputClass } from "../../components/ui";
 import { useStore } from "../../services/store";
 import { nameError, isValidPhone, sanitizePhone, PHONE_ERROR, MAX_NAME_LENGTH } from "../../services/validators";
-import { AdminHeader, AdminLoading, Toast } from "./adminUi";
+import { AdminHeader, AdminLoading, Toast, TABLE_WRAP, TABLE, THEAD, TH, TR, TD, PANEL_TITLE } from "./adminUi";
 import { useToast, runAdmin } from "./adminUtils";
 
 // Figma: 07 Admin / 06 / admin-users-families (20:982)
@@ -102,24 +102,24 @@ export default function AdminUsersView() {
   return (
     <div className="max-w-[1200px]">
       <AdminHeader actionLabel="Thêm tài khoản phụ huynh" onAction={() => setAdding(true)} />
-      <div className="flex flex-col gap-6">
-        <Card className="p-4 sm:p-5 flex flex-col gap-4">
-          <p className="font-bold text-vp-ink">Danh sách tài khoản phụ huynh ({parents.length})</p>
-          <div className="overflow-x-auto rounded-xl border border-vp-border">
-            <table className="w-full min-w-[720px] text-sm">
-              <thead className="bg-vp-canvas/70 text-left text-xs text-vp-muted">
-                <tr><th className="px-4 py-3">Phụ huynh (Email)</th><th className="px-4 py-3">Số điện thoại</th><th className="px-4 py-3">Gói đăng ký</th><th className="px-4 py-3">Hồ sơ trẻ liên kết</th><th className="px-4 py-3">Trạng thái</th></tr>
+      <div className="flex flex-col gap-5">
+        <Card flat className="p-6 flex flex-col gap-4">
+          <p className={PANEL_TITLE}>Danh sách tài khoản phụ huynh</p>
+          <div className={TABLE_WRAP}>
+            <table className={TABLE}>
+              <thead className={THEAD}>
+                <tr><th className={TH}>Phụ huynh (Email)</th><th className={TH}>Số điện thoại</th><th className={TH}>Gói đăng ký</th><th className={TH}>Hồ sơ trẻ liên kết</th><th className={TH}>Trạng thái</th></tr>
               </thead>
               <tbody>
                 {parents.map((p) => {
                   const plan = PLAN_LABEL[p.plan] || PLAN_LABEL.free;
                   return (
-                    <tr key={p.id} data-testid={`user-row-${p.id}`} onClick={() => setSelectedId(p.id)} className={`cursor-pointer border-t border-vp-border ${p.id === selected?.id ? "bg-vp-sky/40" : "hover:bg-vp-canvas/60"}`}>
-                      <td className="px-4 py-3"><p className="font-bold text-vp-ink">{p.name}</p><p className="text-xs text-vp-muted">{p.email}</p></td>
-                      <td className="px-4 py-3 text-vp-ink whitespace-nowrap">{p.phone}</td>
-                      <td className="px-4 py-3"><span className={`rounded-lg px-2 py-1 text-xs font-bold ${plan.cls}`}>{plan.label}</span></td>
-                      <td className="px-4 py-3 font-semibold text-vp-ink">{p.kids.map((k) => `${k.name} (${k.age}t)`).join(", ") || "—"}</td>
-                      <td className="px-4 py-3"><span className={`rounded-lg px-2 py-1 text-xs font-bold ${p.status === "locked" ? "bg-red-50 text-red-500" : "bg-emerald-50 text-emerald-600"}`}>{p.status === "locked" ? "Khóa" : "Bình thường"}</span></td>
+                    <tr key={p.id} data-testid={`user-row-${p.id}`} onClick={() => setSelectedId(p.id)} className={`cursor-pointer ${TR} ${p.id === selected?.id ? "bg-vp-sky/40" : "hover:bg-vp-canvas/60"}`}>
+                      <td className={TD}><p className="font-semibold text-[#0F172A]">{p.name}</p><p className="text-xs text-[#94A3B8]">{p.email}</p></td>
+                      <td className={`${TD} text-[#475569] whitespace-nowrap`}>{p.phone}</td>
+                      <td className={TD}><span className={`whitespace-nowrap rounded-[20px] px-2.5 py-1 text-[11px] font-semibold ${plan.cls}`}>{plan.label}</span></td>
+                      <td className={`${TD} font-semibold text-[#0F172A]`}>{p.kids.map((k) => `${k.name} (${k.age}t)`).join(", ") || "—"}</td>
+                      <td className={TD}><span className={`whitespace-nowrap rounded-[20px] px-2.5 py-1 text-[11px] font-semibold ${p.status === "locked" ? "bg-red-50 text-red-500" : "bg-emerald-50 text-emerald-600"}`}>{p.status === "locked" ? "Khóa" : "Bình thường"}</span></td>
                     </tr>
                   );
                 })}
@@ -129,30 +129,30 @@ export default function AdminUsersView() {
         </Card>
 
         {selected && (
-          <Card className="p-5 flex flex-col gap-4" data-testid="family-panel">
-            <p className="font-bold text-vp-ink">Hồ sơ gia đình liên kết — {selected.name}</p>
+          <Card flat className="p-6 flex flex-col gap-5" data-testid="family-panel">
+            <p className={PANEL_TITLE}>Hồ sơ gia đình liên kết — {selected.name}</p>
             {kids.length === 0 && <p className="text-sm text-vp-muted">Chưa có hồ sơ trẻ nào.</p>}
             {kids.map((k, i) => (
-              <div key={k.id} className="rounded-xl border border-vp-border bg-vp-canvas/50 p-4 flex flex-col gap-1.5">
-                <p className="text-xs font-bold uppercase text-orange-500">Trẻ {i + 1}: {k.name} ({k.age} tuổi)</p>
+              <div key={k.id} className="rounded-xl border border-[#E2E8F0] bg-[#F8FAFC] p-4 flex flex-col gap-1.5">
+                <p className="text-[13px] font-bold uppercase text-[#EA580C]">Trẻ {i + 1}: {k.name} ({k.age} tuổi)</p>
                 <div className="flex justify-between text-xs"><span className="text-vp-muted">Điểm phát âm trung bình:</span><span className="font-bold text-vp-ink">{k.score ? `${k.score}% (${k.score >= 90 ? "Hoàn hảo" : k.score >= 75 ? "Khá" : "Cần luyện"})` : "Chưa luyện"}</span></div>
                 <div className="flex justify-between text-xs"><span className="text-vp-muted">Tiến độ:</span><span className="font-bold text-vp-ink">{k.completed_lessons}/{admin.data.lessons.filter((l) => l.status === "published").length} bài đã hoàn thành</span></div>
                 <div className="flex justify-between text-xs"><span className="text-vp-muted">Điểm tích lũy:</span><span className="font-bold text-vp-ink">{k.stars} điểm</span></div>
               </div>
             ))}
             <div className="flex flex-col sm:flex-row gap-3">
-              <button data-testid="reset-password" onClick={resetPassword} className="flex-1 h-11 rounded-full bg-vp-blue text-sm font-bold text-white">Cấp lại mật khẩu tạm</button>
-              <button data-testid="toggle-lock" onClick={() => setStatus(selected.status === "locked" ? "active" : "locked")} className={`h-11 rounded-xl border px-5 text-sm font-bold ${selected.status === "locked" ? "border-emerald-500 text-emerald-600" : "border-red-400 text-red-500"}`}>
+              <button data-testid="reset-password" onClick={resetPassword} className="flex-1 h-11 rounded-lg bg-vp-blue text-sm font-semibold text-white">Cấp lại mật khẩu tạm</button>
+              <button data-testid="toggle-lock" onClick={() => setStatus(selected.status === "locked" ? "active" : "locked")} className={`h-11 rounded-lg border px-5 text-sm font-semibold ${selected.status === "locked" ? "border-emerald-500 text-emerald-600" : "border-red-400 text-red-500"}`}>
                 {selected.status === "locked" ? "Mở khoá tài khoản" : "Khoá tài khoản"}
               </button>
-              <button data-testid="delete-account" onClick={() => setConfirmDelete(true)} className="h-11 rounded-xl border border-red-400 px-5 text-sm font-bold text-red-500">Xóa tài khoản</button>
+              <button data-testid="delete-account" onClick={() => setConfirmDelete(true)} className="h-11 rounded-lg border border-red-400 px-5 text-sm font-semibold text-red-500">Xóa tài khoản</button>
             </div>
           </Card>
         )}
 
         {orphans.length > 0 && (
-          <Card className="p-5 flex flex-col gap-3" data-testid="orphan-panel">
-            <p className="font-bold text-vp-ink">Hồ sơ bé không thuộc tài khoản nào ({orphans.length})</p>
+          <Card flat className="p-6 flex flex-col gap-3" data-testid="orphan-panel">
+            <p className={PANEL_TITLE}>Hồ sơ bé không thuộc tài khoản nào ({orphans.length})</p>
             <p className="text-xs text-vp-muted">Các hồ sơ cũ được tạo trước khi có tài khoản phụ huynh. Chúng không hiện với bất kỳ phụ huynh nào; có thể xóa hẳn.</p>
             {orphans.map((c) => (
               <div key={c.id} className="flex items-center justify-between gap-3 rounded-xl border border-vp-border px-4 py-2 text-sm">

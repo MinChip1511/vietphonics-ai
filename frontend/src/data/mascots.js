@@ -10,11 +10,11 @@ import khungLong from "../assets/mascots/khung-long.png";
 export const MASCOT_IMAGE = caXanh;
 export const MASCOTS = [
   { id: "mascot:ca-voi", name: "Cá Xanh", src: caXanh },
-  { id: "mascot:cun", name: "Con cún", src: cun },
-  { id: "mascot:tho", name: "Con thỏ", src: tho },
-  { id: "mascot:ga", name: "Con gà", src: ga },
-  { id: "mascot:gau-truc", name: "Gấu trúc", src: gauTruc },
-  { id: "mascot:khung-long", name: "Khủng long", src: khungLong }
+  { id: "mascot:ga", name: "Gà Con", src: ga },
+  { id: "mascot:khung-long", name: "Khủng Long", src: khungLong },
+  { id: "mascot:tho", name: "Thỏ Trắng", src: tho },
+  { id: "mascot:gau-truc", name: "Gấu Trúc", src: gauTruc },
+  { id: "mascot:cun", name: "Chú Cún", src: cun }
 ];
 
 export function getMascot(avatar) {

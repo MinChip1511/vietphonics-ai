@@ -26,7 +26,8 @@ import socialIcons from "../assets/landing/social-icons.svg";
 // Figma: VietPhonics AI landing (1:2) — Hero 1:3, About 1:88, Services 1:118, Progress 1:147,
 // Gallery 1:182, Demo 1:208, Testimonial 1:224, Footer 1:244.
 const INK = "text-[#2e2e2e]";
-const H2 = `font-heading font-medium leading-[1.2] ${INK} text-4xl sm:text-5xl lg:text-[64px]`;
+const H2_BASE = "font-heading font-semibold leading-[1.2] text-4xl sm:text-5xl lg:text-[64px]";
+const H2 = `font-heading font-semibold leading-[1.2] ${INK} text-4xl sm:text-5xl lg:text-[64px]`;
 const INTRO = "Xin chào ba mẹ và các bé! VietPhonics AI giúp bé luyện đọc và phát âm tiếng Việt qua những bài học ngắn, vui nhộn, có trí tuệ nhân tạo lắng nghe và khen ngợi bé mỗi ngày.";
 
 function Avatars({ light }) {
@@ -89,7 +90,7 @@ function Hero({ onStartLearning }) {
           </div>
         </div>
         <PillButton variant="outline" onClick={onStartLearning} className="self-start">Bài học tương tác</PillButton>
-        <h2 className={`font-heading font-medium leading-[1.3] ${INK} text-5xl sm:text-6xl lg:text-[80px]`}>VietPhonics AI<br />là gì?</h2>
+        <h2 className={`font-heading font-semibold leading-[1.3] ${INK} text-5xl sm:text-6xl lg:text-[80px]`}>VietPhonics AI<br />là gì?</h2>
         <PillButton data-testid="landing-start" id="btn-start-learning" onClick={onStartLearning} className="self-start">Bắt đầu học</PillButton>
       </div>
     </section>
@@ -124,18 +125,12 @@ function About({ onStartLearning, onSignup }) {
   );
 }
 
-const SERVICE_TABS = {
-  learn: "Nghe mẫu, đọc theo và nhận phản hồi ngay trong một luồng học.",
-  smooth: "Chuyển từ bài này sang bài khác liền mạch, không cần chờ đợi.",
-  safe: "Giọng nói của bé được xử lý an toàn và không chia sẻ cho bên thứ ba."
-};
-
 function Services({ onStartLearning }) {
   const [tab, setTab] = useState("learn");
   const steps = [
     { title: "Nghe mẫu", body: "Bé nghe cách phát âm của âm, từ hoặc câu." },
     { title: "Đọc theo", body: "Bé nhấn micro và đọc lại bằng giọng của mình." },
-    { title: "AI phản hồi", body: "VietPhonics AI phân tích phần đọc và đưa ra phản hồi phù hợp." },
+    { title: "AI Phản Hồi", body: "VietPhonics AI phân tích phần đọc và đưa ra phản hồi phù hợp." },
     { title: "Luyện lại", body: "Nếu cần, bé nghe mẫu chậm hơn và thử lại để cải thiện." }
   ];
   return (
@@ -148,7 +143,6 @@ function Services({ onStartLearning }) {
               <PillButton key={id} variant={tab === id ? "solid" : "blueOutline"} onClick={() => setTab(id)} className="w-28 h-10">{label}</PillButton>
             ))}
           </div>
-          <p className={`text-sm ${INK} max-w-sm`}>{SERVICE_TABS[tab]}</p>
         </div>
       </div>
       <div className="grid gap-6 lg:grid-cols-[1fr_2fr]">
@@ -165,7 +159,7 @@ function Services({ onStartLearning }) {
         <div className="grid gap-5 sm:grid-cols-2">
           {steps.map((s) => (
             <div key={s.title} className="rounded-[20px] bg-white p-7 flex flex-col justify-between gap-16 min-h-[240px] lg:min-h-[319px]">
-              <p className={`font-heading text-[32px] leading-[1.3] ${INK}`}>{s.title}</p>
+              <p className={`font-heading text-[32px] leading-[1.3] capitalize ${INK}`}>{s.title}</p>
               <p className={`text-xl leading-[1.3] ${INK}`}>{s.body}</p>
             </div>
           ))}
@@ -186,15 +180,15 @@ function ProgressSection({ onOpenParentDashboard }) {
         <h2 className={`${H2} max-w-[728px]`}>Một cách học phù hợp với trẻ 4–7 tuổi</h2>
         <p className={`text-xl leading-[1.3] ${INK} max-w-[460px] lg:mt-16`}>Không cần những bài học dài hay nhiều chữ. VietPhonics AI tập trung vào những hoạt động ngắn, trực quan và có hướng dẫn bằng giọng nói để bé dễ dàng bắt đầu.</p>
       </div>
-      <div className="rounded-[20px] bg-white p-6 sm:p-12 flex flex-col gap-10">
+      <div className="rounded-[20px] bg-white p-6 sm:p-12 flex flex-col gap-10 lg:min-h-[635px]">
         <div className="flex flex-wrap items-center justify-end gap-4">
-          <div className="flex flex-wrap gap-3">
+          <div className="flex flex-wrap gap-px">
             {[["kids", "Trẻ em"], ["smooth", "Liền mạch"], ["safe", "An toàn"]].map(([id, label]) => (
-              <PillButton key={id} variant={tab === id ? "solid" : "blueOutline"} onClick={() => setTab(id)}>{label}</PillButton>
+              <PillButton key={id} variant={tab === id ? "solid" : "blueOutline"} onClick={() => setTab(id)} className="w-[104.8px] whitespace-nowrap">{label}</PillButton>
             ))}
           </div>
         </div>
-        <div className="grid gap-8 lg:grid-cols-[340px_1fr_auto] items-center">
+        <div className="grid gap-8 lg:grid-cols-[340px_1fr_320px] items-center">
           <div className="flex flex-col gap-10">
             <div className="rounded-3xl bg-vp-canvas p-6 flex flex-col gap-4">
               <p className={`flex items-center gap-3 text-xl ${INK}`}><CircleCheck className="w-5 h-5 text-vp-blue" /> Học Thông Minh</p>
@@ -206,10 +200,11 @@ function ProgressSection({ onOpenParentDashboard }) {
             <PillButton onClick={onOpenParentDashboard} className="self-start">Khám phá thêm</PillButton>
           </div>
           <img src={progressPhoto} alt="Bé đang làm bài tập" className="h-[260px] sm:h-[344px] w-full rounded-[20px] object-cover" />
-          <div className="relative w-[200px] h-[200px] mx-auto">
+          <div className="relative w-[260px] h-[260px] lg:w-[320px] lg:h-[320px] mx-auto">
             <svg viewBox="0 0 160 160" className="w-full h-full -rotate-90" aria-hidden="true">
-              <circle cx="80" cy="80" r={r} fill="none" stroke="#EEF1FA" strokeWidth="12" />
-              <circle cx="80" cy="80" r={r} fill="none" stroke="#1978DC" strokeWidth="12" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={circ * (1 - value / 100)} />
+              <defs><linearGradient id="ringGrad" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stopColor="#1978DC" /><stop offset="1" stopColor="#7FC4FF" /></linearGradient></defs>
+              <circle cx="80" cy="80" r={r} fill="none" stroke="#EEF1FA" strokeWidth="14" />
+              <circle cx="80" cy="80" r={r} fill="none" stroke="url(#ringGrad)" strokeWidth="14" strokeLinecap="round" strokeDasharray={circ} strokeDashoffset={circ * (1 - value / 100)} />
             </svg>
             <div className={`absolute inset-0 grid place-content-center text-center ${INK}`}>
               <p className="text-[40px] leading-none">{value}%</p>
@@ -227,10 +222,12 @@ function Gallery({ onOpenParentDashboard }) {
   return (
     <section className="flex flex-col gap-8">
       <div className="flex flex-col lg:flex-row justify-between gap-6">
-        <h2 className={`${H2} text-[#001a35] max-w-[572px]`}>Ba mẹ luôn biết bé đang tiến bộ thế nào</h2>
-        <div className="flex items-start gap-6">
-          <p className={`text-xl leading-[1.3] ${INK} max-w-[310px]`}>Từ những bài đã hoàn thành đến khả năng phát âm, Parent Dashboard giúp ba mẹ theo dõi hành trình học của bé một cách rõ ràng.</p>
-          <img src={galleryThumb} alt="" className="hidden sm:block h-[140px] w-[160px] rounded-3xl object-cover" />
+        <div className="flex w-full flex-col sm:flex-row items-start justify-between gap-6">
+          <img src={galleryThumb} alt="" className="hidden sm:block h-[140px] w-[160px] shrink-0 rounded-3xl object-cover" />
+          <div className="flex flex-col gap-4 sm:items-end sm:text-right">
+            <h2 className={`${H2_BASE} text-[#001a35] max-w-[572px]`}>Ba mẹ luôn biết bé đang tiến bộ thế nào</h2>
+            <p className={`text-xl leading-[1.3] ${INK} max-w-[310px]`}>Từ những bài đã hoàn thành đến khả năng phát âm, Parent Dashboard giúp ba mẹ theo dõi hành trình học của bé một cách rõ ràng.</p>
+          </div>
         </div>
       </div>
       <div className="grid gap-6 lg:grid-cols-2">
@@ -238,10 +235,10 @@ function Gallery({ onOpenParentDashboard }) {
           { img: gallery1, tag: "Tiến độ học", text: "Bé đã học gì và hoàn thành bao nhiêu bài." },
           { img: gallery2, tag: "Phát âm", text: "Những âm bé đã làm tốt và những âm cần luyện thêm.", offset: true }
         ].map((g) => (
-          <div key={g.tag} className={`flex flex-col gap-6 ${g.offset ? "lg:mt-20" : ""}`}>
+          <div key={g.tag} className={`flex flex-col gap-6 ${g.offset ? "lg:mt-[87px]" : ""}`}>
             <div className="relative">
               <img src={g.img} alt="" className="h-[260px] sm:h-[351px] w-full rounded-[20px] object-cover" />
-              <span className="absolute top-6 right-6 rounded-[15px] bg-vp-blue px-8 py-2.5 text-base text-white">{g.tag}</span>
+              <span className="absolute top-6 right-6 rounded-[15px] bg-vp-blue px-[10px] min-w-[154px] text-center py-2.5 text-base text-white">{g.tag}</span>
             </div>
             <button onClick={onOpenParentDashboard} className="self-start flex items-center gap-10 rounded-[20px] bg-white p-6 text-left">
               <span className={`max-w-[300px] text-2xl leading-[1.3] ${INK}`}>{g.text}</span>
@@ -293,7 +290,7 @@ function Testimonials({ onStartLearning }) {
   ];
   return (
     <section className="flex flex-col gap-8">
-      <h2 className={`font-heading font-medium leading-[1.3] ${INK} text-4xl sm:text-5xl lg:text-[70px] max-w-[846px]`}>An tâm để bé học, yên tâm để ba mẹ đồng hành</h2>
+      <h2 className={`font-heading font-semibold leading-[1.3] ${INK} text-4xl sm:text-5xl lg:text-[70px] max-w-[846px]`}>An tâm để bé học, yên tâm để ba mẹ đồng hành</h2>
       <PillButton onClick={onStartLearning} className="self-start">Bắt đầu ngay</PillButton>
       <div className="grid gap-5 lg:grid-cols-2">
         {quotes.map((q) => (
@@ -325,7 +322,7 @@ function Footer() {
   return (
     <footer className="border-t border-[#2e2e2e]/20 pt-14 pb-10 flex flex-col gap-16">
       <div className="grid gap-8 lg:grid-cols-[1fr_387px] items-center">
-        <p className={`font-heading text-3xl sm:text-5xl font-medium leading-[1.3] ${INK}`}>Vietphonics AI đã biến việc học thành hoạt động yêu thích của trẻ!</p>
+        <h2 className="font-heading text-3xl sm:text-5xl font-semibold leading-[1.3] text-vp-blue">Vietphonics AI đã biến việc học thành hoạt động yêu thích của trẻ!</h2>
         <img src={footerPhoto} alt="Bé vui vẻ bên chồng sách" className="h-[186px] w-full rounded-3xl object-cover" />
       </div>
       <div className="grid gap-10 lg:grid-cols-3">

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { Download, Trash2 } from "lucide-react";
+import { ChevronDown, Download, Trash2 } from "lucide-react";
 import { Card, PageHeader, Modal, Button } from "../../components/ui";
 import { useStore } from "../../services/store";
 import { nameError, MAX_NAME_LENGTH } from "../../services/validators";
@@ -41,7 +41,7 @@ function ProfileForm({ child }) {
     setAge(child.age);
     setRegion(getChildSettings(child.id).region);
   };
-  const field = "h-12 w-full rounded-full border border-vp-border bg-white px-4 text-sm text-vp-ink outline-none focus:border-vp-blue";
+  const field = "w-full rounded-full border border-vp-border bg-white px-4 py-3 text-sm text-vp-ink outline-none focus:border-vp-blue";
 
   return (
     <Card className="p-6 sm:p-8 rounded-3xl flex flex-col gap-6">
@@ -52,10 +52,13 @@ function ProfileForm({ child }) {
         {problem && <span className="text-xs text-red-500">{problem}</span>}
       </label>
       <label className="flex flex-col gap-2">
-        <span className="text-sm font-bold text-vp-ink">Độ tuổi hiện tại</span>
-        <select className={field} value={age} onChange={(e) => { setAge(e.target.value); setSaved(false); }}>
-          {AGE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
+        <span className="text-sm font-bold text-vp-ink">Độ tuổi mầm non hiện tại</span>
+        <span className="relative block">
+          <select className={`${field} appearance-none pr-11`} value={age} onChange={(e) => { setAge(e.target.value); setSaved(false); }}>
+            {AGE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+          </select>
+          <ChevronDown className="pointer-events-none absolute right-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-vp-muted" />
+        </span>
       </label>
       <div className="flex flex-col gap-2">
         <span className="text-sm font-bold text-vp-ink">Vùng miền phát âm mục tiêu mong muốn</span>
@@ -112,11 +115,8 @@ export default function ChildProfileView({ profiles, selectedChild, onSelectChil
 
   return (
     <div className="flex flex-col gap-7 max-w-[1080px]">
-      <PageHeader
-        subtitle="Cập nhật thông tin để AI chấm điểm và gợi ý bài học phù hợp với con."
-        actions={<ChildSwitcher profiles={profiles} selectedChild={selectedChild} onSelectChild={onSelectChild} />}
-      />
-      <div className="grid gap-6 lg:grid-cols-[1.7fr_1fr] items-start">
+      <div className="-mb-3"><PageHeader bare actions={<ChildSwitcher profiles={profiles} selectedChild={selectedChild} onSelectChild={onSelectChild} />} /></div>
+      <div className="grid gap-6 lg:grid-cols-[740px_1fr] items-start">
         <ProfileForm key={selectedChild.id} child={selectedChild} />
         <Card className="p-6 sm:p-8 rounded-3xl flex flex-col gap-6">
           <p className="text-xl font-bold text-vp-ink">Quyền lợi dữ liệu của bé</p>

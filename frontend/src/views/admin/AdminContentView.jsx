@@ -4,7 +4,7 @@ import { Card, Field, Modal, Button, inputClass } from "../../components/ui";
 import { useStore } from "../../services/store";
 import { speakVietnamese } from "../../services/audioService";
 import { LESSON_STATUS } from "../../data/adminLabels";
-import { AdminHeader, AdminLoading, StatusBadge, Toast } from "./adminUi";
+import { AdminHeader, AdminLoading, StatusBadge, Toast, TABLE_WRAP, TABLE, THEAD, TH, TR, TD, PANEL_TITLE } from "./adminUi";
 import { useToast } from "./adminUtils";
 
 // Figma: 07 Admin / 03 / admin-exercises-content (20:411). The exercises are the words of the lessons
@@ -28,8 +28,8 @@ function WordEditor({ entry, isNew, lessons, phones, onSave, onDelete }) {
   };
 
   return (
-    <Card className="p-5 flex flex-col gap-4" data-testid="exercise-editor">
-      <p className="font-bold text-vp-ink">{isNew ? "Thêm từ vựng phát âm mới" : "Thiết lập chi tiết bài tập"}</p>
+    <Card flat className="p-6 flex flex-col gap-4" data-testid="exercise-editor">
+      <p className={PANEL_TITLE}>{isNew ? "Thêm từ vựng phát âm mới" : "Thiết lập chi tiết bài tập"}</p>
       <Field label="Bài học">
         <select data-testid="exercise-lesson" className={inputClass} value={form.lessonId || ""} onChange={set("lessonId")} disabled={!isNew}>
           <option value="">— Chọn bài học —</option>
@@ -42,12 +42,14 @@ function WordEditor({ entry, isNew, lessons, phones, onSave, onDelete }) {
       <p className="text-[11px] text-vp-muted">Âm vị hợp lệ: {phones.join(" ")}. Giọng đọc mẫu do trình duyệt tạo từ chính chữ của từ.</p>
       {error && <p data-testid="exercise-error" className="text-sm font-semibold text-red-500">{error}</p>}
       <div className="flex gap-2">
-        <button data-testid="exercise-approve" disabled={busy} onClick={save} className="flex-1 h-11 rounded-xl bg-emerald-600 text-sm font-bold text-white disabled:opacity-60">Lưu từ vựng</button>
-        {!isNew && <button data-testid="exercise-delete" disabled={busy} onClick={onDelete} className="h-11 rounded-xl bg-red-50 px-4 text-sm font-bold text-red-500">Xóa từ</button>}
+        <button data-testid="exercise-approve" disabled={busy} onClick={save} className="flex-1 rounded-lg bg-[#16A34A] px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-60">Lưu từ vựng</button>
+        {!isNew && <button data-testid="exercise-delete" disabled={busy} onClick={onDelete} className="rounded-lg bg-red-50 px-4 py-2.5 text-sm font-semibold text-red-500">Xóa từ</button>}
       </div>
     </Card>
   );
 }
+
+const shortId = (id) => (String(id).length > 14 ? `${String(id).slice(0, 12)}…` : id);
 
 export default function AdminContentView() {
   const { admin } = useStore();
@@ -96,28 +98,29 @@ export default function AdminContentView() {
   return (
     <div className="max-w-[1200px]">
       <AdminHeader actionLabel="Thêm từ vựng phát âm mới" onAction={() => { setSelected(null); setDraft(emptyWord(lessons[0]?.id)); }} />
-      <div className="grid gap-6 [&>*]:min-w-0 lg:grid-cols-[1.6fr_1fr] items-start">
-        <Card className="p-4 sm:p-5 flex flex-col gap-4">
+      <div className="grid gap-5 [&>*]:min-w-0 lg:grid-cols-[1fr_346px] items-start">
+        <Card flat className="p-6 flex flex-col gap-4">
           <div className="flex items-center justify-between">
-            <p className="font-bold text-vp-ink">Danh sách cơ sở dữ liệu phát âm</p>
-            <span className="rounded-md bg-vp-canvas px-2 py-1 text-[11px] font-semibold text-vp-ink">Tổng cộng: {entries.length} từ vựng</span>
+            <p className={PANEL_TITLE}>Danh sách cơ sở dữ liệu phát âm</p>
+            <span className="rounded-md bg-[#F8FAFC] border border-[#E2E8F0] px-2 py-1 text-[11px] font-semibold text-[#475569]">Tổng cộng: {entries.length} từ vựng</span>
           </div>
-          <div className="overflow-x-auto rounded-xl border border-vp-border">
-            <table className="w-full min-w-[620px] text-sm">
-              <thead className="bg-vp-canvas/70 text-left text-xs text-vp-muted">
-                <tr><th className="px-4 py-3">Từ vựng (Việt)</th><th className="px-4 py-3">Chuỗi âm vị</th><th className="px-4 py-3">Bài học</th><th className="px-4 py-3">Nghe mẫu</th><th className="px-4 py-3">Trạng thái</th></tr>
+          <div className={TABLE_WRAP}>
+            <table className={TABLE}>
+              <thead className={THEAD}>
+                <tr><th className={TH}>ID</th><th className={TH}>Từ vựng (Việt)</th><th className={TH}>Chuỗi âm vị</th><th className={TH}>Bài học</th><th className={TH}>Nghe mẫu</th><th className={TH}>Trạng thái</th></tr>
               </thead>
               <tbody>
                 {entries.map((ex) => (
                   <tr key={`${ex.lessonId}-${ex.id}`} data-testid={`exercise-row-${ex.id}`} onClick={() => { setDraft(null); setSelected({ lessonId: ex.lessonId, wordId: ex.id }); }}
-                    className={`cursor-pointer border-t border-vp-border ${current && ex.id === current.id && ex.lessonId === current.lessonId && !draft ? "bg-vp-sky/40" : "hover:bg-vp-canvas/60"}`}>
-                    <td className="px-4 py-3 font-bold text-orange-500">{ex.word}</td>
-                    <td className="px-4 py-3 text-vp-ink font-mono text-xs">{ex.canonical}</td>
-                    <td className="px-4 py-3 text-vp-ink">{ex.lessonTitle}</td>
-                    <td className="px-4 py-3">
+                    className={`cursor-pointer ${TR} ${current && ex.id === current.id && ex.lessonId === current.lessonId && !draft ? "bg-vp-sky/40" : "hover:bg-vp-canvas/60"}`}>
+                    <td className={`${TD} text-xs text-[#94A3B8] whitespace-nowrap`} title={ex.id}>{shortId(ex.id)}</td>
+                    <td className={`${TD} font-semibold text-orange-500`}>{ex.word}</td>
+                    <td className={`${TD} text-[#475569] font-mono text-xs`}>{ex.canonical}</td>
+                    <td className={`${TD} text-[#475569]`}>{ex.lessonTitle}</td>
+                    <td className={TD}>
                       <button onClick={(e) => { e.stopPropagation(); speakVietnamese(ex.word); }} aria-label={`Nghe ${ex.word}`} className="text-vp-blue"><PlayCircle className="w-5 h-5" /></button>
                     </td>
-                    <td className="px-4 py-3"><StatusBadge map={LESSON_STATUS} status={ex.lessonStatus} /></td>
+                    <td className={TD}><StatusBadge map={LESSON_STATUS} status={ex.lessonStatus} /></td>
                   </tr>
                 ))}
               </tbody>
@@ -128,7 +131,9 @@ export default function AdminContentView() {
           <WordEditor key="new" entry={draft} isNew lessons={lessons} phones={admin.data.phones} onSave={save} />
         ) : current ? (
           <WordEditor key={`${current.lessonId}-${current.id}-${current.word}`} entry={current} lessons={lessons} phones={admin.data.phones} onSave={save} onDelete={() => setConfirmDelete(true)} />
-        ) : null}
+        ) : (
+          <Card flat className="p-6 text-sm text-vp-muted">Chọn một từ để chỉnh sửa.</Card>
+        )}
       </div>
       <Modal open={confirmDelete} onClose={() => setConfirmDelete(false)} title={`Xóa từ "${current?.word}"?`}
         footer={<><Button variant="ghost" onClick={() => setConfirmDelete(false)}>Giữ lại</Button><Button variant="danger" data-testid="exercise-confirm-delete" onClick={remove}>Xóa</Button></>}

@@ -50,9 +50,9 @@ export default function LessonCatalogView({ onSelectLesson, initialCategory = "a
               data-testid={`lesson-${lesson.id}`}
               disabled={locked}
               onClick={() => { playSoundEffect("click"); onSelectLesson(lesson.id, category); }}
-              className={`flex flex-col gap-4 rounded-3xl bg-white p-6 text-left shadow-[0_4px_6px_rgba(30,27,75,0.02)] transition ${
-                status === "current" ? "border-[2.5px] border-vp-blue" : "border border-vp-border hover:border-vp-blue"
-              } ${locked ? "opacity-65 cursor-not-allowed hover:border-vp-border" : ""}`}
+              className={`flex flex-col gap-4 rounded-3xl bg-white p-6 text-left transition ${
+                status === "current" ? "border-[2.5px] border-vp-blue shadow-vp-cta" : "shadow-vp-lift border border-vp-border hover:border-vp-blue"
+              } ${locked ? "cursor-not-allowed hover:border-vp-border" : ""}`}
             >
               <div className={`h-[140px] w-full rounded-2xl grid place-items-center ${locked ? "bg-vp-border" : "bg-vp-sky"}`}>
                 {locked ? (
@@ -66,7 +66,7 @@ export default function LessonCatalogView({ onSelectLesson, initialCategory = "a
                   <span className="text-xs font-bold text-vp-muted">BÀI {index + 1}</span>
                   <StatusChip status={status} score={score} />
                 </div>
-                <p className={`font-heading text-xl font-extrabold ${locked ? "text-slate-500" : "text-vp-ink"}`}>
+                <p className={`font-heading text-xl font-extrabold text-[#0D3577]`}>
                   {lesson.title.replace(/^Bài \d+: /, "")}
                 </p>
                 <p className="flex items-center gap-1.5 text-xs text-vp-muted">

@@ -1,7 +1,7 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   User, Phone, Mail, Lock, ArrowRight, ArrowLeft, ShieldCheck, Heart, Sparkles, Volume2, Mic, Cpu, Star,
-  FileText, Check, Lightbulb
+  FileText, Check, Lightbulb, Smile, Cake, Mic2, GraduationCap
 } from "lucide-react";
 import { useStore } from "../../services/store";
 import { speakVietnamese } from "../../services/audioService";
@@ -10,7 +10,7 @@ import ChildAvatar from "../../components/ChildAvatar";
 import { Modal, Button } from "../../components/ui";
 import { nameError, sanitizePhone, isValidPhone, isValidPassword, PHONE_ERROR, PASSWORD_HINT } from "../../services/validators";
 import MicCheckStep from "./MicCheckStep";
-import AuthLayout, { AuthField, PasswordInput, Stepper, authInput } from "./AuthLayout";
+import AuthLayout, { AuthField, PasswordInput, Stepper, authInput, authCard, authTitle, authPrimary, authSecondary } from "./AuthLayout";
 
 // Figma: Đăng ký bước 1 (69:1529), bước 2 Hồ sơ của bé (70:2245), bước 3 Bảo mật giọng nói (70:2623).
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -64,11 +64,11 @@ function StepOne({ data, setData, onNext, auth }) {
   return (
     <form onSubmit={next} className="flex flex-col gap-5" data-testid="signup-step-1">
       <div>
-        <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase text-vp-blue"><ShieldCheck className="w-4 h-4" /> Khởi tạo tài khoản gia đình</p>
-        <h1 className="font-heading text-3xl font-extrabold text-vp-ink">Thông tin phụ huynh</h1>
+        <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.6px] text-vp-blue"><ShieldCheck className="w-4 h-4" /> Khởi tạo tài khoản gia đình</p>
+        <h1 className={authTitle}>Thông tin phụ huynh</h1>
         <p className="text-sm text-vp-muted">Quản lý lộ trình học tập, giám sát phát âm và nhận thông báo cá nhân hoá hàng ngày.</p>
       </div>
-      <div className="rounded-3xl bg-white p-5 sm:p-6 flex flex-col gap-5 shadow-[0_12px_32px_rgba(30,27,75,0.05)]">
+      <div className="rounded-[48px] bg-white p-5 sm:p-8 flex flex-col gap-5 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-2px_rgba(0,0,0,0.1)]">
         <AuthField label="Họ và tên phụ huynh" hint="Người đồng hành chính" icon={User} error={errors.name}>
           <input data-testid="su-name" className={authInput} value={data.name} onChange={set("name")} placeholder="Nguyễn Hoàng Nam" />
         </AuthField>
@@ -84,7 +84,7 @@ function StepOne({ data, setData, onNext, auth }) {
           <PasswordInput testId="su-password" value={data.password} onChange={set("password")} placeholder="••••••••" />
         </AuthField>
         <div className="flex justify-end">
-          <button data-testid="su-next-1" type="submit" className="h-12 rounded-full bg-vp-blue px-6 text-sm font-bold text-white flex items-center gap-2 hover:brightness-110">
+          <button data-testid="su-next-1" type="submit" className={authPrimary}>
             Tiếp tục: Thiết lập hồ sơ bé <ArrowRight className="w-4 h-4" />
           </button>
         </div>
@@ -102,7 +102,7 @@ function StepTwo({ data, setData, onBack, onNext }) {
     setError(null);
     onNext();
   };
-  const card = "rounded-3xl bg-white p-5 sm:p-6 flex flex-col gap-6 shadow-[0_12px_32px_rgba(30,27,75,0.05)]";
+  const card = `${authCard} p-5 sm:p-8 flex flex-col gap-6`;
 
   return (
     <div className="flex flex-col gap-5" data-testid="signup-step-2">
@@ -111,37 +111,38 @@ function StepTwo({ data, setData, onBack, onNext }) {
           <span className="flex items-center gap-1 rounded-full bg-amber-100 px-2.5 py-1 text-[10px] font-bold uppercase text-amber-700"><Sparkles className="w-3 h-3" /> Cá nhân hóa AI</span>
           <span className="text-[11px] text-vp-muted">Thời gian hoàn thiện: ~1 phút</span>
         </div>
-        <h1 className="font-heading text-3xl font-extrabold uppercase text-vp-ink mt-1">Thiết lập hồ sơ bé yêu</h1>
+        <h1 className={`${authTitle} uppercase mt-1`}>Thiết lập hồ sơ bé yêu</h1>
         <p className="text-sm text-vp-muted">Bé sẽ đồng hành cùng người bạn <b className="text-vp-blue">Cá Xanh</b> trong hành trình khám phá ngữ âm vui nhộn và tự tin bước vào lớp 1!</p>
       </div>
       <div className={card}>
         <div>
-          <p className="font-bold text-vp-ink">Chọn người bạn hoạt hình đại diện cho bé:</p>
-          <p className="text-xs text-vp-muted mb-3">Bé có thể đổi lại bất cứ lúc nào</p>
-          <div className="flex flex-wrap gap-4">
+          <p className="flex items-center gap-2 text-base font-bold text-[#181C22]"><Smile className="w-4 h-4 text-vp-blue" /> Chọn người bạn hoạt hình đại diện cho bé:</p>
+          <p className="text-xs text-[#414753] mb-4">Bé có thể đổi lại bất cứ lúc nào</p>
+          <div className="flex flex-wrap gap-5">
             {MASCOTS.map((m) => (
-              <button key={m.id} type="button" onClick={() => set({ avatar: m.id })} className="flex flex-col items-center gap-1">
-                <span className={`rounded-full p-0.5 border-2 ${data.avatar === m.id ? "border-vp-blue" : "border-transparent"}`}>
-                  <ChildAvatar avatar={m.id} className="w-16 h-16" />
+              <button key={m.id} type="button" onClick={() => set({ avatar: m.id })} className="flex flex-col items-center gap-1.5">
+                <span className={`relative grid place-items-center w-16 h-16 rounded-full border-2 ${data.avatar === m.id ? "border-vp-blue" : "border-transparent"}`}>
+                  <ChildAvatar avatar={m.id} className="w-14 h-14" />
+                  {data.avatar === m.id && <span className="absolute -top-1.5 -right-1.5 grid place-items-center w-6 h-6 rounded-full bg-vp-blue text-white"><Check className="w-3.5 h-3.5" strokeWidth={3} /></span>}
                 </span>
-                <span className={`text-xs ${data.avatar === m.id ? "font-bold text-vp-blue" : "text-vp-ink"}`}>{m.name}</span>
+                <span className={`text-xs ${data.avatar === m.id ? "font-bold text-vp-blue" : "font-semibold text-[#414753]"}`}>{m.name}</span>
               </button>
             ))}
           </div>
         </div>
-        <AuthField label="Tên gọi thân mật ở nhà của bé *" icon={Heart} error={error}>
+        <AuthField label={<span className="normal-case tracking-normal text-base font-bold text-[#181C22]">Tên gọi thân mật ở nhà của bé <span className="text-red-500">*</span></span>} icon={Heart} error={error}>
           <input data-testid="su-child-name" className={authInput} value={data.childName} onChange={(e) => { set({ childName: e.target.value }); setError(null); }} maxLength={30} placeholder="Bé Bắp" />
         </AuthField>
         <p className="-mt-4 text-xs text-vp-muted">Cá Xanh sẽ gọi đúng tên này khi trò chuyện và khen ngợi bé trong các bài phát âm.</p>
         <div className="flex flex-col gap-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <p className="font-bold text-vp-ink">Độ tuổi hiện tại của bé:</p>
+            <p className="flex items-center gap-2 text-base font-bold text-[#181C22]"><Cake className="w-4 h-4 text-vp-blue" /> Độ tuổi hiện tại của bé:</p>
             <span className="rounded-full bg-vp-sky px-2.5 py-1 text-[10px] font-bold text-vp-blue">Phù hợp nhất: 4 - 7 tuổi</span>
           </div>
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+          <div className="flex flex-wrap gap-3">
             {AGES.map((a) => (
-              <button key={a.age} type="button" onClick={() => set({ age: a.age })} className={`rounded-3xl py-3 ${data.age === a.age ? "bg-vp-blue text-white" : "bg-[#EEF1FA] text-vp-ink"}`}>
-                <span className="block font-heading text-2xl font-extrabold">{a.age}</span>
+              <button key={a.age} type="button" onClick={() => set({ age: a.age })} className={`w-[158px] rounded-[32px] py-3 transition-transform ${data.age === a.age ? "bg-vp-blue text-white scale-105 shadow-lg" : "bg-[#F1F3FC] text-[#181C22]"}`}>
+                <span className="block font-heading text-[32px] leading-10 font-extrabold">{a.age}</span>
                 <span className="block text-xs">{a.label}</span>
               </button>
             ))}
@@ -149,31 +150,32 @@ function StepTwo({ data, setData, onBack, onNext }) {
           <p className="flex items-start gap-2 rounded-xl bg-vp-sky/60 px-3 py-2 text-xs text-vp-ink"><Lightbulb className="w-4 h-4 text-vp-blue shrink-0" /><span><b>Đặc trưng lứa tuổi {data.age}:</b> {AGE_NOTES[data.age]}</span></p>
         </div>
         <div className="flex flex-col gap-3">
-          <p className="font-bold text-vp-ink">Chất giọng mục tiêu ba mẹ muốn bé rèn luyện:</p>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <p className="flex items-center gap-2 text-base font-bold text-[#181C22]"><Mic2 className="w-4 h-4 text-vp-blue" /> Chất giọng mục tiêu ba mẹ muốn bé rèn luyện:</p>
+          <div className="flex flex-wrap gap-3">
             {REGIONS.map((r) => (
               <div key={r.id} role="button" tabIndex={0} onClick={() => set({ region: r.id })} onKeyDown={(e) => e.key === "Enter" && set({ region: r.id })}
-                className={`cursor-pointer rounded-2xl border-2 p-4 text-left ${data.region === r.id ? "border-vp-blue bg-white shadow-vp-card" : "border-transparent bg-[#EEF1FA]"}`}
+                className={`relative cursor-pointer rounded-3xl border-2 p-4 pr-10 text-left w-full sm:w-[calc(33.333%-0.5rem)] sm:min-w-[240px] ${data.region === r.id ? "border-vp-blue bg-white shadow-vp-card" : "border-transparent bg-[#F1F3FC]"}`}
               >
-                <p className={`flex items-center justify-between font-bold ${data.region === r.id ? "text-vp-blue" : "text-vp-ink"}`}>{r.title} {data.region === r.id && <Check className="w-4 h-4" />}</p>
+                <p className={`flex items-center font-bold ${data.region === r.id ? "text-vp-blue" : "text-vp-ink"}`}>{r.title}</p>
+                <span className={`absolute top-4 right-4 grid place-items-center w-5 h-5 rounded-full border-2 ${data.region === r.id ? "border-vp-blue" : "border-[#767676]"}`}>{data.region === r.id && <span className="w-2.5 h-2.5 rounded-full bg-vp-blue" />}</span>
                 <p className="mt-1 text-xs text-vp-muted">{r.desc}</p>
-                <button type="button" onClick={(e) => { e.stopPropagation(); speakVietnamese(r.sample); }} className="mt-2 flex items-center gap-1 text-[11px] font-bold text-vp-blue"><Volume2 className="w-3 h-3" /> Nghe thử mẫu</button>
+                <button type="button" onClick={(e) => { e.stopPropagation(); speakVietnamese(r.sample); }} className="mt-2 flex items-center gap-1 text-xs font-bold text-vp-blue"><Volume2 className="w-3 h-3" /> Nghe thử mẫu</button>
               </div>
             ))}
           </div>
         </div>
         <div className="flex flex-col gap-3">
-          <p className="font-bold text-vp-ink">Khảo sát nhanh trình độ hiện tại của bé:</p>
+          <p className="flex items-center gap-2 text-base font-bold text-[#181C22]"><GraduationCap className="w-4 h-4 text-vp-blue" /> Khảo sát nhanh trình độ hiện tại của bé:</p>
           {LEVELS.map((l) => (
-            <label key={l.id} className={`flex cursor-pointer items-start gap-3 rounded-2xl p-3 ${data.level === l.id ? "bg-vp-sky/70" : "bg-[#EEF1FA]"}`}>
-              <input type="radio" name="level" checked={data.level === l.id} onChange={() => set({ level: l.id })} className="mt-1 w-4 h-4 accent-[#1978dc]" />
+            <label key={l.id} className={`flex cursor-pointer items-start gap-3 rounded-2xl p-4 ${data.level === l.id ? "bg-vp-sky/70" : "bg-[#F1F3FC]"}`}>
+              <input type="radio" name="level" checked={data.level === l.id} onChange={() => set({ level: l.id })} className="mt-1 w-5 h-5 accent-[#1978dc]" />
               <span><span className="block text-sm font-bold text-vp-ink">{l.title}</span><span className="block text-xs text-vp-muted">{l.desc}</span></span>
             </label>
           ))}
         </div>
         <div className="flex flex-wrap justify-between gap-3">
-          <button type="button" onClick={onBack} className="h-12 rounded-full bg-[#EEF1FA] px-5 text-sm font-bold text-vp-ink flex items-center gap-2"><ArrowLeft className="w-4 h-4" /> Quay lại Bước 1</button>
-          <button data-testid="su-next-2" type="button" onClick={next} className="h-12 rounded-full bg-vp-blue px-6 text-sm font-bold text-white flex items-center gap-2">Tiếp tục: Thiết lập bảo mật giọng nói <ArrowRight className="w-4 h-4" /></button>
+          <button type="button" onClick={onBack} className={authSecondary}><ArrowLeft className="w-4 h-4" /> Quay lại Bước 1</button>
+          <button data-testid="su-next-2" type="button" onClick={next} className={authPrimary}>Tiếp tục: Thiết lập bảo mật giọng nói <ArrowRight className="w-4 h-4" /></button>
         </div>
       </div>
     </div>
@@ -183,15 +185,15 @@ function StepTwo({ data, setData, onBack, onNext }) {
 const TIERS = [
   { icon: Mic, title: "Tầng 1: Thu âm", body: "Giọng nói của bé được thu qua micro của thiết bị rồi gửi tới máy chủ VietPhonics chỉ để chấm điểm." },
   { icon: Cpu, title: "Tầng 2: AI chấm điểm", body: "Mô hình AI nghe và so khớp âm tiếng Việt của bé với từ cần đọc. File ghi âm không được lưu lại trên máy chủ sau khi chấm.", active: true },
-  { icon: Star, title: "Tầng 3: Khích lệ & sửa âm", body: "Bé nhận điểm, lời khen và hướng dẫn nhẹ nhàng để đọc tốt hơn ở lần sau." }
+  { gold: true, icon: Star, title: "Tầng 3: Khích lệ & sửa âm", body: "Bé nhận điểm, lời khen và hướng dẫn nhẹ nhàng để đọc tốt hơn ở lần sau." }
 ];
 
 function StepThree({ data, setData, onBack, onNext }) {
   const [showPolicy, setShowPolicy] = useState(false);
   const set = (patch) => setData({ ...data, ...patch });
   const consent = (key, title, tag, tone, body) => (
-    <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-[#EEF1FA] p-4">
-      <input data-testid={`consent-${key}`} type="checkbox" checked={data[key]} onChange={(e) => set({ [key]: e.target.checked })} className="mt-1 w-5 h-5 shrink-0 accent-[#1978dc]" />
+    <label className="flex cursor-pointer items-start gap-3 rounded-2xl bg-[#F7F8FD] p-4">
+      <input data-testid={`consent-${key}`} type="checkbox" checked={data[key]} onChange={(e) => set({ [key]: e.target.checked })} className="mt-1 w-6 h-6 shrink-0 rounded-[4px] accent-[#1978dc]" />
       <span>
         <span className="flex flex-wrap items-center gap-2 text-sm font-bold text-vp-ink">{title} <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${tone}`}>{tag}</span></span>
         <span className="block mt-1 text-xs text-vp-muted">{body}</span>
@@ -203,13 +205,13 @@ function StepThree({ data, setData, onBack, onNext }) {
     <div className="flex flex-col gap-5" data-testid="signup-step-3">
       <div>
         <div className="flex flex-wrap gap-2">
-          <span className="rounded-full bg-[#EEF1FA] px-2.5 py-1 text-[10px] font-bold uppercase text-vp-ink">Không lưu file ghi âm trên máy chủ</span>
+          <span className="rounded-full bg-[#F1F3FC] px-2.5 py-1 text-[10px] font-bold uppercase text-vp-ink">Không lưu file ghi âm trên máy chủ</span>
         </div>
-        <h1 className="font-heading text-3xl font-extrabold uppercase text-vp-ink mt-1">Cam kết bảo mật giọng nói của bé</h1>
+        <h1 className={`${authTitle} uppercase mt-1`}>Cam kết bảo mật giọng nói của bé</h1>
         <p className="text-sm text-vp-muted max-w-2xl">Quyền riêng tư và an toàn âm thanh của trẻ em là nguyên tắc tối thượng tại VietPhonics AI. Mọi dữ liệu thu âm đều được kiểm soát bởi phụ huynh.</p>
       </div>
       <div className="grid gap-6 lg:grid-cols-[1.3fr_1fr] items-start">
-        <div className="rounded-3xl bg-white p-5 sm:p-6 flex flex-col gap-4 shadow-[0_12px_32px_rgba(30,27,75,0.05)]">
+        <div className="rounded-[48px] bg-white p-5 sm:p-8 flex flex-col gap-4 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-2px_rgba(0,0,0,0.1)]">
           <div className="flex items-start gap-3 rounded-2xl bg-vp-sky/60 p-4">
             <ShieldCheck className="w-6 h-6 text-vp-blue shrink-0" />
             <span><b className="text-sm text-vp-ink">Chính sách không kinh doanh dữ liệu</b><span className="block text-xs text-vp-muted">VietPhonics AI tuyệt đối không chia sẻ, bán hoặc sử dụng âm thanh giọng nói của bé cho bất kỳ bên thứ ba hay mạng quảng cáo thương mại nào.</span></span>
@@ -226,24 +228,24 @@ function StepThree({ data, setData, onBack, onNext }) {
           </div>
           <p className="text-xs text-vp-muted">Phụ huynh có toàn quyền yêu cầu xóa vĩnh viễn toàn bộ nhật ký ghi âm của con bất cứ lúc nào trong Cổng Phụ Huynh.</p>
           <div className="flex flex-wrap justify-between gap-3">
-            <button type="button" onClick={onBack} className="h-12 rounded-full bg-[#EEF1FA] px-5 text-sm font-bold text-vp-ink flex items-center gap-2"><ArrowLeft className="w-4 h-4" /> Quay lại sửa hồ sơ bé</button>
+            <button type="button" onClick={onBack} className={authSecondary}><ArrowLeft className="w-4 h-4" /> Quay lại sửa hồ sơ bé</button>
             <button data-testid="su-next-mic" type="button" disabled={!data.consentAnalysis} onClick={onNext}
               title={data.consentAnalysis ? undefined : "Cần đồng ý mục bắt buộc để tiếp tục"}
-              className="h-12 rounded-full bg-vp-blue px-6 text-sm font-bold text-white disabled:bg-slate-300 disabled:text-slate-500"
+              className={`${authPrimary} disabled:bg-slate-300 disabled:text-slate-500 disabled:shadow-none`}
             >
               Tiếp tục: kiểm tra micro
             </button>
           </div>
         </div>
-        <div className="rounded-3xl bg-white p-5 sm:p-6 flex flex-col gap-3 shadow-[0_12px_32px_rgba(30,27,75,0.05)]">
+        <div className="rounded-[48px] bg-white p-5 sm:p-8 flex flex-col gap-3 shadow-[0_4px_6px_-1px_rgba(0,0,0,0.1),0_2px_4px_-2px_rgba(0,0,0,0.1)]">
           <div className="flex items-center justify-between">
             <p className="text-sm font-bold uppercase text-vp-ink">Quy trình xử lý âm thanh 3 tầng</p>
             
           </div>
           {TIERS.map((t, i) => (
             <React.Fragment key={t.title}>
-              <div className={`flex items-start gap-3 rounded-2xl p-4 ${t.active ? "bg-vp-blue text-white" : "bg-[#EEF1FA]"}`}>
-                <span className={`w-10 h-10 shrink-0 rounded-full grid place-items-center ${t.active ? "bg-white text-vp-blue" : "bg-vp-blue text-white"}`}><t.icon className="w-5 h-5" /></span>
+              <div className={`flex items-start gap-3 rounded-2xl p-4 ${t.active ? "bg-vp-blue text-white" : "bg-[#F1F3FC]"}`}>
+                <span className={`w-10 h-10 shrink-0 rounded-full grid place-items-center ${t.active ? "bg-white text-vp-blue" : t.gold ? "bg-[#765700] text-white" : "bg-vp-blue text-white"}`}><t.icon className="w-5 h-5" /></span>
                 <span><b className="text-sm">{t.title}</b><span className={`block text-xs ${t.active ? "text-white/85" : "text-vp-muted"}`}>{t.body}</span></span>
               </div>
               {i < TIERS.length - 1 && <span className="self-center text-vp-blue">↓</span>}
@@ -268,6 +270,7 @@ export default function SignupView({ nav, onRegistered }) {
   const { auth } = useStore();
   const [step, setStep] = useState(1);
   const [error, setError] = useState(null);
+  useEffect(() => { window.scrollTo(0, 0); }, [step]);
   const [data, setData] = useState({
     name: "", phone: "", email: "", password: "",
     avatar: MASCOTS[0].id, childName: "", age: 5, region: "north", level: "mid",

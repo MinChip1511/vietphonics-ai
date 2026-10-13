@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Card, PageHeader } from "../components/ui";
+import { Card } from "../components/ui";
 import { fetchPracticeHistory } from "../services/apiService";
 import { useStore } from "../services/store";
 import ChildSwitcher from "./parent/ChildSwitcher";
@@ -49,37 +49,39 @@ export default function ParentDashboardView({ profiles, selectedChild, onSelectC
 
   return (
     <div className="flex flex-col gap-7 max-w-[1080px]">
-      <PageHeader
-        title={`Chào mừng ${parentName} trở lại!`}
-        subtitle={`Báo cáo phân tích tự động từ trợ lý AI dựa trên ${history.length} lần ghi âm phát âm gần đây của con.`}
-        actions={<ChildSwitcher profiles={profiles} selectedChild={selectedChild} onSelectChild={onSelectChild} />}
-      />
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between pb-6 border-b border-vp-border">
+        <div className="min-w-0 flex flex-col gap-1">
+          <h2 className="font-heading text-3xl sm:text-[40px] font-extrabold text-vp-ink leading-tight">{`Chào mừng ${parentName} trở lại!`}</h2>
+          <p className="text-sm text-vp-muted">{`Báo cáo phân tích tự động từ trợ lý AI dựa trên ${history.length} lần ghi âm phát âm gần đây của con.`}</p>
+        </div>
+        <div className="flex flex-wrap gap-2"><ChildSwitcher profiles={profiles} selectedChild={selectedChild} onSelectChild={onSelectChild} /></div>
+      </div>
 
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
-        <Card className="p-5 rounded-2xl flex flex-col gap-2">
+        <Card className="p-5 rounded-2xl flex flex-col gap-2 min-h-[157px]">
           <p className="text-[11px] font-bold uppercase text-vp-muted">Tiến trình tuần này</p>
           <p className="font-heading text-[28px] font-extrabold text-vp-ink">{thisWeek}%</p>
-          <div className="h-1.5 w-32 rounded bg-zinc-100 overflow-hidden"><div className="h-full bg-vp-blue" style={{ width: `${thisWeek}%` }} /></div>
-          <p className={`text-xs font-semibold ${delta >= 0 ? "text-emerald-500" : "text-red-500"}`}>{delta >= 0 ? "+" : ""}{delta}% so với tuần trước</p>
+          <div className="h-1.5 w-[120px] max-w-full rounded bg-[#F4F4F5] overflow-hidden mb-0"><div className="h-full bg-vp-blue" style={{ width: `${thisWeek}%` }} /></div>
+          <p className={`-mt-1 text-xs font-semibold ${delta >= 0 ? "text-emerald-500" : "text-red-500"}`}>{delta >= 0 ? "+" : ""}{delta}% so với tuần trước</p>
         </Card>
-        <Card className="p-5 rounded-2xl flex flex-col gap-2">
+        <Card className="p-5 rounded-2xl flex flex-col gap-2 min-h-[157px]">
           <p className="text-[11px] font-bold uppercase text-vp-muted">Chuỗi ngày học liên tiếp</p>
           <p className="flex items-baseline gap-2 text-vp-blue"><span className="font-heading text-[28px] font-extrabold">{child.streak} ngày</span><span className="text-sm font-bold">🔥 Chăm chỉ</span></p>
           <p className="text-xs text-vp-muted">{child.name} đang xếp top 35% độ chăm chỉ toàn khóa học.</p>
         </Card>
-        <Card className="p-5 rounded-2xl flex flex-col gap-2">
+        <Card className="p-5 rounded-2xl flex flex-col gap-2 min-h-[157px]">
           <p className="text-[11px] font-bold uppercase text-vp-muted">Tỉ lệ phát âm chuẩn AI</p>
           <p className="font-heading text-[28px] font-extrabold text-emerald-500">{child.overall_accuracy}%</p>
           <p className="text-xs text-vp-muted">Độ nhạy AI thiết lập phù hợp với trẻ {child.age} tuổi.</p>
         </Card>
-        <Card className="p-5 rounded-2xl flex flex-col gap-2">
+        <Card className="p-5 rounded-2xl flex flex-col gap-2 min-h-[157px]">
           <p className="text-[11px] font-bold uppercase text-vp-muted">Cúp & Huy hiệu tích lũy</p>
           <p className="font-heading text-[28px] font-extrabold text-amber-500">{child.stars} Sao</p>
           <p className="text-xs text-vp-muted">Đã đủ điều kiện quy đổi {Math.floor((child.stars || 0) / 100)} phần quà trong Kho phần thưởng.</p>
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-[1.6fr_1fr]">
+      <div className="grid gap-6 items-start lg:grid-cols-[640px_1fr]">
         <Card className="p-6 flex flex-col gap-5">
           <div className="flex items-start justify-between gap-3">
             <div>

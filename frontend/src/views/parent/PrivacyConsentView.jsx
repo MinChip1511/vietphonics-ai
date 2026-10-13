@@ -1,4 +1,5 @@
 import React from "react";
+import { ChevronDown } from "lucide-react";
 import { Card, PageHeader, Toggle } from "../../components/ui";
 import { useStore } from "../../services/store";
 import ChildSwitcher from "./ChildSwitcher";
@@ -19,11 +20,7 @@ export default function PrivacyConsentView({ profiles, selectedChild, onSelectCh
 
   return (
     <div className="flex flex-col gap-7 max-w-[1080px]">
-      <PageHeader
-        title="Cam kết bảo mật tệp giọng nói của trẻ em"
-        subtitle="Ba mẹ quyết định giọng nói của bé có được phân tích bằng AI hay không, và xuất hoặc xóa dữ liệu của bé bất cứ lúc nào."
-        actions={<ChildSwitcher profiles={profiles} selectedChild={selectedChild} onSelectChild={onSelectChild} />}
-      />
+      <div className="-mb-3"><PageHeader bare actions={<ChildSwitcher profiles={profiles} selectedChild={selectedChild} onSelectChild={onSelectChild} />} /></div>
       <Card className="p-6 sm:p-8 rounded-3xl flex flex-col gap-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
@@ -45,8 +42,9 @@ export default function PrivacyConsentView({ profiles, selectedChild, onSelectCh
 
         <div className="flex items-center justify-between gap-4 rounded-2xl border border-vp-border p-5">
           <div className="flex flex-col gap-1.5">
-            <p className="font-bold text-vp-ink">
-              2. Cho phép sử dụng tệp thu âm ẩn danh để đào tạo mô hình ngôn ngữ tiếng Việt (Mặc định: TẮT)
+            <p className="flex flex-wrap items-center gap-2 font-bold text-vp-ink">
+              2. Cho phép sử dụng tệp thu âm ẩn danh để đào tạo mô hình ngôn ngữ tiếng Việt
+              <span className="rounded-md bg-[#FFE4E6] px-2 py-0.5 text-[9px] font-bold text-[#9F1239]">MẶC ĐỊNH TẮT</span>
             </p>
             <p className="text-[13px] leading-relaxed text-vp-muted">Chúng tôi tuyệt đối tôn trọng sự riêng tư của bé. Tùy chọn này tắt mặc định để đảm bảo không tệp âm thanh nào được dùng nâng cấp mô hình AI nếu không được bạn chủ động tích chọn.</p>
           </div>
@@ -58,14 +56,17 @@ export default function PrivacyConsentView({ profiles, selectedChild, onSelectCh
             <p className="font-bold text-vp-ink">3. Thời hạn lưu trữ tệp ghi âm giọng nói của con</p>
             <p className="text-[13px] leading-relaxed text-vp-muted">Hiện hệ thống chưa lưu bản ghi âm trên máy chủ; lựa chọn này sẽ có hiệu lực khi tính năng lưu trữ được bật.</p>
           </div>
+          <span className="relative shrink-0">
           <select
             aria-label="Thời hạn lưu trữ"
             value={s.retention}
             onChange={(e) => set({ retention: e.target.value })}
-            className="shrink-0 rounded-xl border border-vp-border bg-[#faf9f5] px-4 py-2.5 text-[13px] font-bold text-vp-ink"
+            className="appearance-none rounded-xl border border-vp-border bg-[#faf9f5] py-2.5 pl-4 pr-10 text-[13px] font-bold text-vp-ink"
           >
             {RETENTION.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
           </select>
+          <ChevronDown className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-vp-muted" />
+          </span>
         </div>
         <p className="text-xs text-vp-muted">Thay đổi được lưu tự động cho hồ sơ {selectedChild.name}.</p>
       </Card>

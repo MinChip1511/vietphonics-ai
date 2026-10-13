@@ -92,17 +92,17 @@ export default function AdminRewardsView() {
   return (
     <div className="max-w-[1200px]">
       <AdminHeader />
-      <Card className="p-5 mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      <Card flat className="p-5 mb-5 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <div className="flex items-center gap-4">
-          <span className="w-12 h-12 shrink-0 rounded-lg border border-vp-border bg-slate-50 grid place-items-center"><ImagePlus className="w-5 h-5 text-vp-muted" /></span>
+          <span className="w-12 h-12 shrink-0 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] grid place-items-center"><ImagePlus className="w-5 h-5 text-vp-muted" /></span>
           <div>
             <p className="text-sm font-bold text-vp-ink">Thêm phần thưởng trực quan mới</p>
             <p className="text-xs text-vp-muted">Tải lên hình ảnh sticker, trang phục hoặc huy hiệu để các bé đổi bằng điểm tích lũy khi học.</p>
           </div>
         </div>
-        <button data-testid="reward-create" onClick={() => setEditing({ title: "", kind: REWARD_KINDS[0], cost: 200, image: null })} className="self-start sm:self-auto rounded-full bg-vp-blue px-4 py-2 text-xs font-semibold text-white">Tạo phần thưởng</button>
+        <button data-testid="reward-create" onClick={() => setEditing({ title: "", kind: REWARD_KINDS[0], cost: 200, image: null })} className="self-start sm:self-auto rounded-lg bg-vp-blue px-4 py-2 text-sm font-semibold text-white">Tạo phần thưởng</button>
       </Card>
-      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4 mb-5">
+      <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4 mb-5">
         {rewards.map((r) => (
           <div key={r.id} data-testid={`reward-card-${r.id}`} className="rounded-xl border border-slate-200 bg-white overflow-hidden flex flex-col">
             <div className="h-40 bg-vp-canvas grid place-items-center">
@@ -126,7 +126,7 @@ export default function AdminRewardsView() {
           </div>
         ))}
       </div>
-      <Card className="p-4 flex items-start gap-3">
+      <Card flat className="p-4 flex items-start gap-3">
         <Percent className="w-6 h-6 text-orange-500 shrink-0" />
         <div>
           <p className="text-sm font-bold text-slate-900">Các chương trình khuyến mãi & Nhiệm vụ đổi điểm đặc biệt (Promotions Campaign)</p>

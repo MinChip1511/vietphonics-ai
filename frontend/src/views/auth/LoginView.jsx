@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from "react";
-import { Mail, Lock, KeyRound, Send, ArrowRight, ShieldCheck, Gift } from "lucide-react";
+import { Mail, Lock, KeyRound, Send, ArrowRight, Hand, Gift, Headset } from "lucide-react";
 import { useStore } from "../../services/store";
 import { HOTLINE } from "../../constants";
-import AuthLayout, { AuthField, PasswordInput, authInput } from "./AuthLayout";
+import AuthLayout, { AuthField, PasswordInput, authInput, authCard, authTitle } from "./AuthLayout";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -16,7 +16,7 @@ export default function LoginView({ nav, onLoggedIn, notice }) {
   const [cooldown, setCooldown] = useState(0);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [remember, setRemember] = useState(true);
+  const [remember, setRemember] = useState(false);
   const [error, setError] = useState(null);
   const [info, setInfo] = useState(null);
   const [busy, setBusy] = useState(false);
@@ -53,17 +53,17 @@ export default function LoginView({ nav, onLoggedIn, notice }) {
 
   return (
     <AuthLayout onGoHome={nav.home} onLogin={nav.login} onSignup={nav.signup}>
-      <div className="max-w-[860px] mx-auto rounded-[28px] bg-white p-6 sm:p-10 shadow-[0_12px_32px_rgba(30,27,75,0.06)] flex flex-col gap-6" data-testid="login-view">
+      <div className={`${authCard} max-w-[860px] p-6 sm:p-10 flex flex-col gap-6`} data-testid="login-view">
         <div>
-          <p className="flex items-center gap-1.5 text-[11px] font-bold uppercase text-amber-700"><ShieldCheck className="w-4 h-4" /> Cổng điều khiển phụ huynh</p>
-          <h1 className="font-heading text-3xl font-extrabold text-vp-ink mt-1">Chào mừng Ba Mẹ trở lại!</h1>
-          <p className="text-sm text-vp-muted max-w-sm">Đăng nhập để theo dõi bảng điều khiển học tập và thành tích ngữ âm của con.</p>
+          <p className="flex items-center gap-1 text-xs font-bold uppercase tracking-[0.6px] text-[#765700]"><Hand className="w-[18px] h-[18px]" /> Cổng điều khiển phụ huynh</p>
+          <h1 className={`${authTitle} mt-1`}>Chào mừng Ba Mẹ trở lại!</h1>
+          <p className="text-sm text-[#414753] max-w-sm">Đăng nhập để theo dõi bảng điều khiển học tập và thành tích ngữ âm của con.</p>
         </div>
         {notice && <p className="rounded-xl bg-vp-sky px-4 py-3 text-sm font-semibold text-vp-blue">{notice}</p>}
 
-        <div className="grid grid-cols-2 rounded-full bg-[#EEF1FA] p-1">
+        <div className="grid grid-cols-2 rounded-full bg-[#EBEDF7] p-1">
           {[{ id: "otp", label: "Email + mã xác thực", icon: KeyRound }, { id: "email", label: "Email & Mật khẩu", icon: Mail }].map(({ id, label, icon: Icon }) => (
-            <button key={id} data-testid={`tab-${id}`} onClick={() => switchTab(id)} className={`flex items-center justify-center gap-2 h-9 rounded-full text-xs sm:text-sm font-bold ${tab === id ? "bg-vp-blue text-white" : "text-vp-ink"}`}>
+            <button key={id} data-testid={`tab-${id}`} onClick={() => switchTab(id)} className={`flex items-center justify-center gap-2 h-9 rounded-full text-xs sm:text-sm font-bold ${tab === id ? "bg-vp-blue text-white shadow-sm" : "text-[#414753]"}`}>
               <Icon className="w-4 h-4" /> <span className="truncate">{label}</span>
             </button>
           ))}
@@ -98,26 +98,26 @@ export default function LoginView({ nav, onLoggedIn, notice }) {
             </>
           )}
 
-          <label className="flex items-center gap-2 text-sm text-vp-ink">
-            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="w-4 h-4 accent-[#1978dc]" /> Ghi nhớ đăng nhập an toàn
+          <label className="flex items-center gap-2 pt-1 text-sm text-[#414753]">
+            <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="w-5 h-5 rounded-[2.5px] border border-[#767676] accent-[#1978dc]" /> Ghi nhớ đăng nhập an toàn
           </label>
           {info && tab === "otp" && <p data-testid="otp-info" className="rounded-xl bg-amber-50 px-4 py-2 text-xs font-semibold text-amber-700">{info}</p>}
           {error && <p data-testid="login-error" className="rounded-xl bg-red-50 px-4 py-2 text-sm font-semibold text-red-500">{error}</p>}
 
-          <button data-testid="login-submit" type="submit" disabled={busy} className="h-14 rounded-full bg-vp-blue text-base font-bold text-white hover:brightness-110 disabled:opacity-60 flex items-center justify-center gap-2">
+          <button data-testid="login-submit" type="submit" disabled={busy} className="h-16 rounded-full bg-vp-blue text-lg font-bold text-white shadow-md hover:brightness-110 disabled:opacity-60 flex items-center justify-center gap-2">
             Đăng Nhập Vào Bảng Phụ Huynh <ArrowRight className="w-5 h-5" />
           </button>
         </form>
 
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-2xl bg-[#EEF1FA] p-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 rounded-[32px] bg-[#D5E3FF]/30 p-4">
           <p className="flex items-start gap-2 text-sm">
             <Gift className="w-5 h-5 text-vp-blue shrink-0" />
-            <span><b className="text-vp-ink">Ba Mẹ chưa có tài khoản VietPhonics AI?</b><span className="block text-xs text-vp-muted">Đăng ký mới để nhận ngay 3 buổi đánh giá phát âm AI miễn phí.</span></span>
+            <span><b className="text-vp-ink">Ba Mẹ chưa có tài khoản VietPhonics AI?</b><span className="block text-xs text-[#414753]">Đăng ký mới để nhận ngay 3 buổi đánh giá phát âm AI miễn phí.</span></span>
           </p>
-          <button onClick={nav.signup} className="self-start sm:self-auto rounded-full bg-vp-blue px-4 py-2 text-xs font-bold text-white">Tạo tài khoản ngay</button>
+          <button onClick={nav.signup} className="self-start sm:self-auto rounded-full bg-vp-blue px-4 py-1 text-xs font-bold text-white shadow-sm">Tạo tài khoản ngay</button>
         </div>
 
-        <p className="text-[11px] text-vp-muted">Cần hỗ trợ? Gọi tổng đài VietPhonics: <b className="text-vp-blue">{HOTLINE}</b></p>
+        <p className="flex items-center justify-end gap-1 pt-2 text-[11px] font-semibold text-[#1978DC]"><Headset className="w-3 h-3" /> Tổng đài chuyên viên sư phạm: {HOTLINE} (24/7)</p>
       </div>
     </AuthLayout>
   );

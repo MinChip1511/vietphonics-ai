@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Card, Field, inputClass } from "../../components/ui";
 import { useStore } from "../../services/store";
 import { formatVnd } from "../../data/adminLabels";
-import { AdminHeader, AdminLoading, Toast } from "./adminUi";
+import { AdminHeader, AdminLoading, Toast, TABLE_WRAP, TABLE, THEAD, TH, TR, TD, PANEL_TITLE } from "./adminUi";
 import { useToast, runAdmin } from "./adminUtils";
 
 // Figma: 07 Admin / 05 / admin-promotions-coupons (20:823)
@@ -43,26 +43,26 @@ export default function AdminPromotionsView() {
   return (
     <div className="max-w-[1200px]">
       <AdminHeader actionLabel="Tạo mã giảm giá mới" onAction={() => document.getElementById("coupon-code")?.focus()} />
-      <div className="grid gap-6 [&>*]:min-w-0 lg:grid-cols-[1.7fr_1fr] items-start">
-        <Card className="p-4 sm:p-5 flex flex-col gap-4">
-          <p className="font-bold text-vp-ink">Mã ưu đãi đang áp dụng</p>
-          <div className="overflow-x-auto rounded-xl border border-vp-border">
-            <table className="w-full min-w-[640px] text-sm">
-              <thead className="bg-vp-canvas/70 text-left text-xs text-vp-muted">
-                <tr><th className="px-4 py-3">Mã (Code)</th><th className="px-4 py-3">Chiến dịch / Nội dung</th><th className="px-4 py-3">Mức giảm giá</th><th className="px-4 py-3">Thời hạn hiệu lực</th><th className="px-4 py-3">Trạng thái</th></tr>
+      <div className="grid gap-5 [&>*]:min-w-0 lg:grid-cols-[1fr_380px] items-start">
+        <Card flat className="p-6 flex flex-col gap-4">
+          <p className={PANEL_TITLE}>Mã ưu đãi đang áp dụng</p>
+          <div className={TABLE_WRAP}>
+            <table className={TABLE}>
+              <thead className={THEAD}>
+                <tr><th className={TH}>Mã (Code)</th><th className={TH}>Chiến dịch / Nội dung</th><th className={TH}>Mức giảm giá</th><th className={TH}>Thời hạn hiệu lực</th><th className={TH}>Trạng thái</th></tr>
               </thead>
               <tbody>
                 {coupons.map((c) => {
                   const st = couponState(c);
                   const expired = new Date(c.expires) < new Date();
                   return (
-                    <tr key={c.id} className="border-t border-vp-border">
-                      <td className="px-4 py-3 font-bold text-vp-blue">{c.id}</td>
-                      <td className="px-4 py-3 font-semibold text-vp-ink">{c.campaign}</td>
-                      <td className="px-4 py-3 font-bold text-orange-500">Giảm {c.type === "percent" ? `${c.value}%` : formatVnd(c.value)} {c.scope}</td>
-                      <td className="px-4 py-3 text-vp-muted whitespace-nowrap">{expired ? "Đã hết hạn" : `Đến ${new Date(c.expires).toLocaleDateString("vi-VN")}`}</td>
-                      <td className="px-4 py-3">
-                        <button data-testid={`coupon-toggle-${c.id}`} onClick={() => toggle(c)} title="Bấm để dừng / mở lại" className={`rounded-lg px-2 py-1 text-xs font-bold ${st.cls}`}>{st.label}</button>
+                    <tr key={c.id} className={TR}>
+                      <td className={`${TD} font-bold text-[#1978DC]`}>{c.id}</td>
+                      <td className={`${TD} font-semibold text-[#0F172A]`}>{c.campaign}</td>
+                      <td className={`${TD} font-bold text-orange-500`}>Giảm {c.type === "percent" ? `${c.value}%` : formatVnd(c.value)} {c.scope}</td>
+                      <td className={`${TD} text-[#475569] whitespace-nowrap`}>{expired ? "Đã hết hạn" : `Đến ${new Date(c.expires).toLocaleDateString("vi-VN")}`}</td>
+                      <td className={`${TD} whitespace-nowrap`}>
+                        <button data-testid={`coupon-toggle-${c.id}`} onClick={() => toggle(c)} title="Bấm để dừng / mở lại" className={`whitespace-nowrap rounded-[20px] px-2.5 py-1 text-[11px] font-semibold ${st.cls}`}>{st.label}</button>
                         <button data-testid={`coupon-delete-${c.id}`} onClick={() => remove(c)} className="ml-2 text-xs font-semibold text-red-500">Xóa</button>
                       </td>
                     </tr>
@@ -72,8 +72,8 @@ export default function AdminPromotionsView() {
             </table>
           </div>
         </Card>
-        <Card as="form" onSubmit={create} className="p-5 flex flex-col gap-4">
-          <p className="font-bold text-vp-ink">Tạo nhanh mã giảm giá</p>
+        <Card flat as="form" onSubmit={create} className="p-6 flex flex-col gap-5">
+          <p className={PANEL_TITLE}>Tạo nhanh mã giảm giá</p>
           <Field label="Ký tự Mã giảm giá (Coupon Code)"><input id="coupon-code" data-testid="coupon-code" className={inputClass} value={form.code} onChange={set("code")} placeholder="HOCPHATAM30" /></Field>
           <Field label="Chiến dịch"><input className={inputClass} value={form.campaign} onChange={set("campaign")} placeholder="Ưu đãi mùa hè" /></Field>
           <Field label="Dạng ưu đãi">
@@ -85,7 +85,7 @@ export default function AdminPromotionsView() {
           <Field label={form.type === "percent" ? "Tỷ lệ giảm (%)" : "Số tiền giảm (VNĐ)"}><input data-testid="coupon-value" className={inputClass} type="number" value={form.value} onChange={set("value")} /></Field>
           <Field label="Thời hạn hiệu lực"><input data-testid="coupon-expires" className={inputClass} type="date" value={form.expires} onChange={set("expires")} /></Field>
           {error && <p data-testid="coupon-error" className="text-sm font-semibold text-red-500">{error}</p>}
-          <button data-testid="coupon-create" type="submit" className="h-11 rounded-full bg-vp-blue text-sm font-bold text-white">Kích hoạt mã</button>
+          <button data-testid="coupon-create" type="submit" className="h-11 rounded-lg bg-vp-blue text-sm font-semibold text-white">Kích hoạt mã</button>
         </Card>
       </div>
       <Toast message={toast.message} tone={toast.tone} onDone={toast.clear} />

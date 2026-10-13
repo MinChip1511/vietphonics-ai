@@ -10,12 +10,12 @@ import { MicPermissionScreen, RecordingErrorsScreen } from "./MicScreens";
 // 06 recording-ready (7:293), 07 recording-active (7:332), 08 ai-processing (7:375).
 function Waveform() {
   return (
-    <div className="flex items-center gap-1.5 h-12" aria-hidden="true">
-      {[0.35, 0.6, 1, 0.75, 0.5, 0.25].map((h, i) => (
+    <div className="flex items-center gap-2 h-16" aria-hidden="true">
+      {[20, 40, 64, 50, 30, 12].map((h, i) => (
         <span
           key={i}
           className="w-1.5 rounded-full bg-vp-blue animate-[wave-bar_0.9s_ease-in-out_infinite]"
-          style={{ height: `${h * 100}%`, animationDelay: `${i * 0.12}s` }}
+          style={{ height: `${h}px`, animationDelay: `${i * 0.12}s` }}
         />
       ))}
     </div>
@@ -129,7 +129,7 @@ export default function WordPractice({ lesson, aiEnabled = true, childId, onFini
 
       {phase === "intro" && (
         <>
-          <div className="w-full max-w-[480px] rounded-[28px] border-2 border-vp-sky bg-white p-8 sm:p-10 flex flex-col items-center gap-6 shadow-[0_8px_12px_rgba(30,27,75,0.04)]">
+          <div className="w-full max-w-[480px] rounded-[28px] border-2 border-vp-sky bg-white p-8 sm:p-10 flex flex-col items-center gap-6 shadow-vp-lift">
             <div className="w-40 h-40 rounded-full bg-vp-sky grid place-items-center">
               <span className="font-heading text-8xl font-extrabold text-vp-blue leading-none">{introLetter}</span>
             </div>
@@ -147,7 +147,7 @@ export default function WordPractice({ lesson, aiEnabled = true, childId, onFini
           <button
             id="btn-start-practice"
             onClick={() => { playSoundEffect("click"); setPhase("listen"); }}
-            className="w-full max-w-[400px] flex items-center justify-center gap-2 rounded-3xl bg-vp-blue px-12 py-[18px] font-heading text-xl font-extrabold text-white hover:brightness-110"
+            className="w-full max-w-[400px] flex items-center justify-center gap-2 rounded-3xl bg-vp-blue px-12 py-[18px] font-heading text-xl font-extrabold text-white shadow-vp-cta hover:brightness-110"
           >
             Bắt đầu luyện tập <ArrowRight className="w-5 h-5" />
           </button>
@@ -156,7 +156,7 @@ export default function WordPractice({ lesson, aiEnabled = true, childId, onFini
 
       {phase === "listen" && (
         <>
-          <div className="w-full max-w-[500px] rounded-3xl border-2 border-vp-sky bg-white p-6 flex flex-col items-center gap-4 shadow-[0_8px_12px_rgba(30,27,75,0.04)]">
+          <div className="w-full max-w-[500px] rounded-[32px] border-2 border-vp-sky bg-white p-8 flex flex-col items-center gap-6 shadow-vp-lift">
             <div className="w-full h-[200px] rounded-2xl bg-vp-sky grid place-items-center">
               <span className="text-8xl" aria-hidden="true">{word.illustration}</span>
             </div>
@@ -165,9 +165,9 @@ export default function WordPractice({ lesson, aiEnabled = true, childId, onFini
             <div className="flex flex-wrap items-center justify-center gap-3">
               <button
                 onClick={() => listen(word.word)}
-                className="flex items-center gap-2.5 rounded-[20px] bg-vp-blue px-6 py-3 text-base font-bold text-white hover:brightness-110"
+                className="flex items-center gap-3 rounded-[20px] bg-vp-blue px-6 py-4 text-[18px] font-bold text-white shadow-vp-cta hover:brightness-110"
               >
-                <Volume2 className="w-5 h-5" /> Nhấn để Nghe Lại
+                <Volume2 className="w-6 h-6" /> Nhấn để Nghe Lại
               </button>
               <button
                 onClick={() => setRate(rate === 0.85 ? 0.6 : 0.85)}
@@ -180,7 +180,7 @@ export default function WordPractice({ lesson, aiEnabled = true, childId, onFini
           </div>
           <button
             onClick={() => { playSoundEffect("click"); setPhase("ready"); }}
-            className="w-full max-w-[400px] flex items-center justify-center gap-2 rounded-3xl bg-emerald-500 px-12 py-[18px] font-heading text-xl font-extrabold text-white hover:bg-emerald-600"
+            className="w-full max-w-[400px] flex items-center justify-center gap-2 rounded-3xl bg-emerald-500 px-12 py-[18px] font-heading text-xl font-extrabold text-white shadow-vp-cta hover:bg-emerald-600"
           >
             Con đã sẵn sàng đọc <ChevronRight className="w-5 h-5" />
           </button>
@@ -189,7 +189,7 @@ export default function WordPractice({ lesson, aiEnabled = true, childId, onFini
 
       {phase === "ready" && (
         <>
-          <div className="w-full max-w-[500px] rounded-3xl border-[1.5px] border-vp-sky bg-white p-8 flex flex-col items-center gap-3">
+          <div className="w-full max-w-[500px] rounded-[24px] border-[1.5px] border-vp-sky bg-white p-8 shadow-vp-lift flex flex-col items-center gap-3">
             <p className="text-base font-semibold text-vp-muted">BÉ HÃY ĐỌC TO:</p>
             <p className="font-heading text-5xl font-extrabold text-vp-ink text-center">{word.word}</p>
           </div>
@@ -211,7 +211,7 @@ export default function WordPractice({ lesson, aiEnabled = true, childId, onFini
               onClick={() => { setNotice(null); recorder.start(); }}
               disabled={!aiEnabled || recorder.status === "requesting"}
               aria-label="Bắt đầu thu âm"
-              className="w-[140px] h-[140px] rounded-full bg-vp-blue grid place-items-center text-white shadow-[0_8px_12px_rgba(255,122,0,0.25)] hover:brightness-110 disabled:opacity-60"
+              className="w-[140px] h-[140px] rounded-full bg-vp-blue grid place-items-center text-white shadow-vp-cta hover:brightness-110 disabled:opacity-60"
             >
               {recorder.status === "requesting" ? <Loader className="w-12 h-12 animate-spin" /> : <Mic className="w-16 h-16" strokeWidth={1.5} />}
             </button>
@@ -225,19 +225,19 @@ export default function WordPractice({ lesson, aiEnabled = true, childId, onFini
 
       {phase === "recording" && (
         <>
-          <div className="w-full max-w-[500px] rounded-3xl border-[1.5px] border-vp-blue bg-white p-8 grid place-items-center">
-            <p className="font-heading text-5xl font-extrabold text-vp-blue text-center">{word.word}</p>
+          <div className="w-full max-w-[500px] rounded-3xl border-2 border-vp-blue bg-white p-8 shadow-vp-lift grid place-items-center">
+            <p className="font-heading text-[56px] leading-tight font-extrabold text-vp-blue text-center">{word.word}</p>
           </div>
           <div className="relative grid place-items-center">
-            <span className="absolute w-36 h-36 rounded-full bg-vp-sky animate-pulse-ring" />
+            <span className="absolute w-44 h-44 rounded-full bg-vp-sky animate-pulse-ring" />
             <button
               id="btn-stop-recording"
               onClick={recorder.stop}
               aria-label="Dừng thu âm"
-              className="relative w-[116px] h-[116px] rounded-full bg-vp-blue ring-8 ring-vp-sky grid place-items-center text-white"
+              className="relative w-[140px] h-[140px] rounded-full bg-vp-blue border-[12px] border-vp-sky shadow-vp-cta grid place-items-center text-white"
             >
-              <span className="w-12 h-12 rounded-full border-2 border-white grid place-items-center">
-                <Square className="w-4 h-4" />
+              <span className="w-14 h-14 rounded-full border-2 border-white grid place-items-center">
+                <Square className="w-5 h-5" />
               </span>
             </button>
           </div>
@@ -245,7 +245,7 @@ export default function WordPractice({ lesson, aiEnabled = true, childId, onFini
           <p className="text-sm font-semibold text-vp-muted">{recorder.seconds}s / {recorder.maxSeconds}s</p>
           <button
             onClick={recorder.stop}
-            className="rounded-[20px] bg-vp-sky px-9 py-3 text-base font-bold text-vp-blue"
+            className="rounded-3xl bg-vp-sky px-12 py-4 text-lg font-extrabold text-vp-blue"
           >
             Nhấn để hoàn thành ghi âm
           </button>
@@ -253,12 +253,12 @@ export default function WordPractice({ lesson, aiEnabled = true, childId, onFini
       )}
 
       {phase === "processing" && (
-        <div data-testid="ai-processing" className="w-full max-w-[480px] rounded-3xl border border-vp-border bg-white p-10 flex flex-col items-center gap-4">
-          <div className="w-24 h-24 rounded-full bg-blue-50 grid place-items-center">
-            <Loader className="w-10 h-10 text-vp-blue animate-spin" />
+        <div data-testid="ai-processing" className="w-full max-w-[480px] rounded-[28px] border border-[#E4E4E7] bg-white p-12 shadow-vp-lift flex flex-col items-center gap-8">
+          <div className="w-[120px] h-[120px] rounded-full bg-[#EFF6FF] grid place-items-center">
+            <Loader className="w-14 h-14 text-vp-blue animate-spin" />
           </div>
-          <p className="font-heading text-xl font-extrabold text-vp-ink">Đang phân tích âm thanh...</p>
-          <p className="text-sm text-vp-muted">Học vần bằng trí tuệ nhân tạo mượt mà</p>
+          <p className="font-heading text-[22px] font-extrabold text-vp-ink">Đang phân tích âm thanh...</p>
+          <p className="text-[15px] text-vp-muted">Học vần bằng trí tuệ nhân tạo mượt mà</p>
         </div>
       )}
     </div>

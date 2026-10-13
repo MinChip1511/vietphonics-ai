@@ -1,8 +1,8 @@
 import React, { useEffect, useRef, useState } from "react";
-import { ArrowLeft, Mail, Send, Lock, RotateCcw, CheckCircle2, ShieldCheck } from "lucide-react";
+import { ArrowLeft, Mail, Send, Lock, RotateCcw, CheckCircle2, ShieldCheck, ArrowRight } from "lucide-react";
 import { useStore, passwordStrength } from "../../services/store";
 import { isValidPassword, PASSWORD_HINT } from "../../services/validators";
-import AuthLayout, { AuthField, PasswordInput, authInput } from "./AuthLayout";
+import AuthLayout, { AuthField, PasswordInput, authInput, authCard } from "./AuthLayout";
 
 // Figma: Quên Mật Khẩu (70:2902)
 const STRENGTH = [
@@ -22,7 +22,7 @@ function OtpBoxes({ value, onChange }) {
     if (ch && i < 5) refs.current[i + 1]?.focus();
   };
   return (
-    <div className="flex justify-center gap-2 sm:gap-3" data-testid="otp-boxes">
+    <div className="flex justify-between w-full max-w-[384px] mx-auto" data-testid="otp-boxes">
       {digits.map((d, i) => (
         <input
           key={i}
@@ -34,7 +34,7 @@ function OtpBoxes({ value, onChange }) {
           onChange={(e) => setAt(i, e.target.value.replace(/\D/g, "").slice(-1))}
           onKeyDown={(e) => { if (e.key === "Backspace" && !d.trim() && i > 0) refs.current[i - 1]?.focus(); }}
           onPaste={(e) => { e.preventDefault(); onChange(e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6)); }}
-          className="w-11 h-12 sm:w-12 sm:h-14 rounded-xl bg-white text-center font-heading text-2xl font-extrabold text-vp-blue outline-none focus:ring-2 focus:ring-vp-blue"
+          className="w-11 h-12 rounded-xl bg-white shadow-sm text-center font-heading text-[32px] tracking-[-0.32px] font-extrabold text-[#005CAF] outline-none focus:ring-2 focus:ring-vp-blue"
         />
       ))}
     </div>
@@ -84,17 +84,17 @@ export default function ForgotPasswordView({ nav, onLoggedIn }) {
 
   return (
     <AuthLayout onGoHome={nav.home} onLogin={nav.login} onSignup={nav.signup}>
-      <form onSubmit={submit} className="max-w-[860px] mx-auto rounded-[28px] bg-white p-6 sm:p-10 shadow-[0_12px_32px_rgba(30,27,75,0.06)] flex flex-col gap-5" data-testid="forgot-view">
-        <button type="button" onClick={nav.login} className="self-start flex items-center gap-1 rounded-full bg-[#EEF1FA] px-3 py-1 text-xs font-semibold text-vp-ink"><ArrowLeft className="w-3.5 h-3.5" /> Quay lại Đăng nhập</button>
+      <form onSubmit={submit} className={`${authCard} max-w-[860px] p-6 sm:p-10 flex flex-col gap-5`} data-testid="forgot-view">
+        <button type="button" onClick={nav.login} className="self-start flex items-center gap-1 rounded-full bg-[#EBEDF7] px-4 py-1 text-xs font-semibold text-[#414753]"><ArrowLeft className="w-3.5 h-3.5" /> Quay lại Đăng nhập</button>
         <div>
-          <h1 className="font-heading text-3xl font-extrabold text-vp-ink">Quên mật khẩu?</h1>
-          <p className="text-sm text-vp-muted">Nhập email ba mẹ đã dùng để đăng ký VietPhonics AI. Nếu email có tài khoản, mã bảo mật 6 số sẽ được gửi tới đó.</p>
+          <h1 className="font-heading text-[32px] leading-10 font-bold tracking-[-0.8px] text-[#181C22]">Quên mật khẩu?</h1>
+          <p className="text-base text-[#414753]">Nhập email ba mẹ đã dùng để đăng ký VietPhonics AI. Nếu email có tài khoản, mã bảo mật 6 số sẽ được gửi tới đó.</p>
         </div>
         <AuthField
           label="Email đã đăng ký *"
           icon={Mail}
           right={
-            <button type="button" data-testid="forgot-send" onClick={send} disabled={sent && expires > 240} className="h-12 shrink-0 rounded-full bg-vp-sky px-4 text-sm font-bold text-vp-blue disabled:opacity-60 flex items-center gap-1.5">
+            <button type="button" data-testid="forgot-send" onClick={send} disabled={sent && expires > 240} className="h-[52px] shrink-0 rounded-full bg-[#CCE4ED] px-6 text-xs font-bold text-[#50666E] disabled:opacity-60 flex items-center gap-1.5">
               <Send className="w-4 h-4" /> {sent ? "Gửi lại" : "Gửi mã xác thực"}
             </button>
           }
@@ -103,7 +103,7 @@ export default function ForgotPasswordView({ nav, onLoggedIn }) {
         </AuthField>
 
         {sent && (
-          <div className="rounded-2xl bg-[#EEF1FA] p-4 flex flex-col gap-3">
+          <div className="rounded-3xl bg-[#F1F3FC] p-4 flex flex-col gap-3">
             <div className="flex justify-between text-xs">
               <span className="font-bold text-vp-ink">Nhập mã 6 số trong email (kiểm tra cả mục thư rác)</span>
               <span className="text-vp-muted">Hiệu lực: <b className="text-amber-600">{mm}:{ss}</b></span>
@@ -118,8 +118,8 @@ export default function ForgotPasswordView({ nav, onLoggedIn }) {
         </AuthField>
         {pw && (
           <div className="flex flex-col gap-1.5 -mt-2">
-            <div className="flex justify-between text-xs"><span className="text-vp-muted">Độ mạnh mật khẩu:</span><span className={`font-bold ${STRENGTH[strength].color}`}>{STRENGTH[strength].label}</span></div>
-            <div className="grid grid-cols-4 gap-2">{[1, 2, 3, 4].map((i) => <span key={i} className={`h-1.5 rounded-full ${i <= strength ? STRENGTH[strength].bar : "bg-vp-border"}`} />)}</div>
+            <div className="flex justify-between text-xs"><span className="text-[11px] text-[#414753]">Độ mạnh mật khẩu:</span><span className={`text-[11px] font-bold ${STRENGTH[strength].color}`}>{STRENGTH[strength].label}</span></div>
+            <div className="grid grid-cols-4 gap-1.5">{[1, 2, 3, 4].map((i) => <span key={i} className={`h-1.5 rounded-full ${i <= strength ? STRENGTH[strength].bar : "bg-vp-border"}`} />)}</div>
             {!isValidPassword(pw) && <p className="text-xs text-red-500">{PASSWORD_HINT}</p>}
           </div>
         )}
@@ -127,8 +127,8 @@ export default function ForgotPasswordView({ nav, onLoggedIn }) {
           <PasswordInput testId="forgot-pw2" value={pw2} onChange={(v) => { setPw2(v); setError(null); }} placeholder="Nhập lại mật khẩu" />
         </AuthField>
         {error && <p data-testid="forgot-error" className="rounded-xl bg-red-50 px-4 py-2 text-sm font-semibold text-red-500">{error}</p>}
-        <button data-testid="forgot-submit" type="submit" className="h-14 rounded-full bg-[#0A5BB5] text-base font-bold text-white hover:brightness-110 flex items-center justify-center gap-2">
-          <ShieldCheck className="w-5 h-5" /> Đặt Lại Mật Khẩu & Đăng Nhập Ngay
+        <button data-testid="forgot-submit" type="submit" className="h-[68px] rounded-full bg-[#005CAF] text-base font-bold text-white shadow-[0_10px_15px_-3px_rgba(0,92,175,0.2),0_4px_6px_-4px_rgba(0,92,175,0.2)] hover:brightness-110 flex items-center justify-center gap-2">
+          <ShieldCheck className="w-5 h-5" /> Đặt Lại Mật Khẩu & Đăng Nhập Ngay <ArrowRight className="w-4 h-4" />
         </button>
       </form>
     </AuthLayout>

@@ -34,10 +34,7 @@ export default function ParentProgressView({ profiles, selectedChild, onSelectCh
 
   return (
     <div className="flex flex-col gap-7 max-w-[1080px]">
-      <PageHeader
-        subtitle="Lộ trình từng chương và lịch sử từng lần luyện phát âm được AI chấm điểm."
-        actions={<ChildSwitcher profiles={profiles} selectedChild={selectedChild} onSelectChild={onSelectChild} />}
-      />
+      <div className="-mb-3"><PageHeader bare actions={<ChildSwitcher profiles={profiles} selectedChild={selectedChild} onSelectChild={onSelectChild} />} /></div>
 
       <Card className="p-6 flex flex-col lg:flex-row lg:items-center gap-6">
         <div className="flex flex-col gap-2 lg:w-[380px] shrink-0">
@@ -57,7 +54,7 @@ export default function ParentProgressView({ profiles, selectedChild, onSelectCh
             return (
               <div key={ch.title} className="flex flex-col gap-1.5">
                 <p className={`text-[11px] font-bold ${color}`}>0{i + 1} / {label}</p>
-                <div className="h-2 rounded bg-zinc-100 overflow-hidden"><div className={`h-full ${bar}`} style={{ width: state === "next" ? "0%" : `${Math.max(ch.pct, 8)}%` }} /></div>
+                <div className="h-2 rounded-[4px] bg-zinc-100 overflow-hidden"><div className={`h-full rounded-[4px] ${bar}`} style={{ width: state === "next" ? "0%" : `${Math.max(ch.pct, 8)}%` }} /></div>
                 <p className={`text-[13px] ${state === "next" ? "font-medium text-vp-muted" : "font-bold text-vp-ink"}`}>{ch.title} ({ch.done}/{ch.total})</p>
               </div>
             );
@@ -68,7 +65,8 @@ export default function ParentProgressView({ profiles, selectedChild, onSelectCh
       <Card className="p-6 flex flex-col gap-5">
         <p className="text-lg font-bold text-vp-ink">Bảng chi tiết lịch sử học vần</p>
         <div className="overflow-x-auto rounded-xl border border-vp-border">
-          <table className="w-full min-w-[760px] text-sm">
+          <table className="w-full min-w-[1000px] table-fixed text-sm">
+            <colgroup><col className="w-[300px]" /><col className="w-[200px]" /><col className="w-[200px]" /><col className="w-[150px]" /><col /></colgroup>
             <thead className="bg-[#faf9f5] text-left text-[13px] text-vp-ink">
               <tr>
                 {["Từ đã luyện", "Ngày học gần nhất", "Trạng thái AI", "Điểm chuẩn xác", "Ghi chú ngữ âm"].map((h) => (

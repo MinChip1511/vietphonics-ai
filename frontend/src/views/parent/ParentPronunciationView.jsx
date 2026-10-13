@@ -36,12 +36,9 @@ export default function ParentPronunciationView({ profiles, selectedChild, onSel
 
   return (
     <div className="flex flex-col gap-7 max-w-[1080px]">
-      <PageHeader
-        subtitle="AI tổng hợp độ chệch của từng nhóm âm và cho phép ba mẹ nghe so sánh với giọng mẫu."
-        actions={<ChildSwitcher profiles={profiles} selectedChild={selectedChild} onSelectChild={onSelectChild} />}
-      />
+      <div className="-mb-3"><PageHeader bare actions={<ChildSwitcher profiles={profiles} selectedChild={selectedChild} onSelectChild={onSelectChild} />} /></div>
 
-      <div className="grid gap-6 lg:grid-cols-[1.4fr_1fr]">
+      <div className="grid gap-6 items-start lg:grid-cols-[680px_1fr]">
         <Card className="p-6 flex flex-col gap-5">
           <p className="text-lg font-bold text-vp-ink">Biểu đồ phân tích độ chệch âm tiết (từ các lần luyện của bé)</p>
           {GROUPS.map((g) => {
@@ -88,9 +85,9 @@ export default function ParentPronunciationView({ profiles, selectedChild, onSel
               value={settings.sensitivity}
               onChange={(e) => setChildSettings(selectedChild.id, { sensitivity: Number(e.target.value) })}
               aria-label="Độ khó chấm điểm"
-              className="w-full accent-[#1978dc] my-2"
+              className="w-full my-2 h-2 appearance-none rounded-full bg-[#F4F4F5] cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-vp-blue [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white [&::-webkit-slider-thumb]:shadow [&::-moz-range-thumb]:h-5 [&::-moz-range-thumb]:w-5 [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-vp-blue [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white"
             />
-            <div className="flex justify-between text-[11px] text-vp-muted"><span>Dễ (Bé chậm nói)</span><span>Nghiêm ngặt (Bé 7 tuổi)</span></div>
+            <div className="flex justify-between text-[11px] text-vp-muted"><span>Dễ (Bé chậm nói)</span><span>Nghiêm ngặt (Bé 7 tuổi sắp vào lớp 1)</span></div>
           </div>
         </Card>
       </div>

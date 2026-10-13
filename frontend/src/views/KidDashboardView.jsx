@@ -31,7 +31,7 @@ export default function KidDashboardView({ selectedChild, onStartLesson, onViewA
       <MascotBubble message={greeting} />
 
       {/* Next lesson */}
-      <div className="rounded-3xl border-[1.5px] border-vp-blue bg-vp-sky p-6 sm:p-8 flex flex-col md:flex-row md:items-center gap-6">
+      <div className="rounded-3xl border-[1.5px] border-vp-blue bg-white shadow-vp-lift p-6 sm:p-8 flex flex-col md:flex-row md:items-center gap-6">
         <div className="flex flex-col gap-3 flex-1 min-w-0">
           <div className="flex flex-wrap items-center gap-2">
             <span className="rounded-md bg-vp-blue px-2 py-1 text-[11px] font-bold text-white">BÀI TIẾP THEO</span>
@@ -43,7 +43,7 @@ export default function KidDashboardView({ selectedChild, onStartLesson, onViewA
         <button
           data-testid="continue-lesson"
           onClick={() => { playSoundEffect("click"); onStartLesson(lesson.id, lesson.category); }}
-          className="self-start md:self-auto flex items-center gap-2 rounded-3xl bg-vp-blue px-8 py-4 text-base font-bold text-white hover:brightness-110"
+          className="self-start md:self-auto flex items-center gap-2 rounded-3xl bg-vp-blue px-8 py-4 text-base font-bold text-white shadow-vp-cta hover:brightness-110"
         >
           Học tiếp <Play className="w-5 h-5" />
         </button>

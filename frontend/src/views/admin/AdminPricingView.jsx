@@ -50,16 +50,16 @@ export default function AdminPricingView() {
 
   return (
     <div className="max-w-[1200px]">
-      <AdminHeader />
+      <AdminHeader full />
       <div className="grid gap-5 md:grid-cols-2 xl:grid-cols-3 items-start">
         {admin.data.plans.map((p) => (
-          <div key={p.id} data-testid={`admin-plan-${p.id}`} className={`rounded-2xl bg-white p-5 flex flex-col gap-4 border ${p.active ? "border-vp-blue border-[1.5px]" : "border-vp-border"}`}>
+          <div key={p.id} data-testid={`admin-plan-${p.id}`} className={`rounded-2xl bg-white p-6 flex flex-col gap-5 ${p.active ? "border-2 border-[#1978DC]" : "border border-[#E2E8F0]"}`}>
             <div className="flex items-center justify-between">
-              <span className={`rounded-md px-2 py-1 text-[11px] font-bold ${p.active ? "bg-emerald-50 text-emerald-600" : "bg-red-50 text-red-500"}`}>{p.active ? "Đang hoạt động" : "Tạm ngưng"}</span>
+              <span className={`rounded-[20px] px-2.5 py-1 text-[11px] font-semibold ${p.active ? "bg-[#DCFCE7] text-[#16A34A]" : "bg-[#FEE2E2] text-[#DC2626]"}`}>{p.active ? "Đang hoạt động" : "Tạm ngưng"}</span>
               <CreditCard className={`w-5 h-5 ${p.active ? "text-vp-blue" : "text-vp-muted"}`} />
             </div>
             <div>
-              <p className="font-heading text-lg font-extrabold text-vp-ink">{p.name}</p>
+              <p className="font-heading text-lg font-bold text-[#0F172A]">{p.name}</p>
               <p className="text-xs text-vp-muted">Kế hoạch đăng ký phân tích AI chuẩn.</p>
             </div>
             <div className="flex flex-col gap-1.5 text-sm">
@@ -68,11 +68,11 @@ export default function AdminPricingView() {
             </div>
             <div className="flex flex-col gap-2">
               <p className="text-xs font-bold text-vp-ink">Quyền lợi cốt lõi:</p>
-              {p.perks.map((perk) => <p key={perk} className="flex items-center gap-2 text-xs text-vp-ink"><CheckCircle2 className="w-4 h-4 text-emerald-500 shrink-0" /> {perk}</p>)}
+              {p.perks.map((perk) => <p key={perk} className="flex items-center gap-2 text-[13px] text-[#475569]"><CheckCircle2 className="w-3.5 h-3.5 text-[#16A34A] shrink-0" /> {perk}</p>)}
             </div>
             <div className="flex gap-2">
-              <button onClick={() => { setError(null); setEditing(p); }} className="flex-1 h-10 rounded-xl bg-vp-canvas text-sm font-semibold text-vp-ink">Chỉnh sửa</button>
-              <button data-testid={`toggle-plan-${p.id}`} onClick={() => toggle(p)} className={`h-10 rounded-xl border px-4 text-sm font-bold ${p.active ? "border-red-400 text-red-500" : "border-emerald-500 text-emerald-600"}`}>{p.active ? "Tắt" : "Bật"}</button>
+              <button onClick={() => { setError(null); setEditing(p); }} className="flex-1 h-10 rounded-lg border border-[#E2E8F0] bg-[#F8FAFC] text-[13px] font-semibold text-[#475569]">Chỉnh sửa</button>
+              <button data-testid={`toggle-plan-${p.id}`} onClick={() => toggle(p)} className={`h-10 rounded-lg border px-4 text-[13px] font-semibold ${p.active ? "border-[#DC2626] text-[#DC2626]" : "border-[#16A34A] text-[#16A34A]"}`}>{p.active ? "Tắt" : "Bật"}</button>
             </div>
           </div>
         ))}

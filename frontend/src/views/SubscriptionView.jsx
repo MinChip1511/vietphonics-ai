@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { Check } from "lucide-react";
-import { Card, PageHeader, Tabs, Badge } from "../components/ui";
+import { Card, Tabs, Badge } from "../components/ui";
 import { SUBSCRIPTION_PLANS } from "../data/subscriptionData";
 import { ORDER_STATUS, formatVnd } from "../data/adminLabels";
 import { useStore } from "../services/store";
@@ -20,6 +20,11 @@ export default function SubscriptionView({ onRequireLogin }) {
     const live = plans.find((x) => x.id === p.id);
     return live ? { ...p, monthlyPrice: live.monthly, yearlyPrice: live.yearly } : null;
   }).filter(Boolean);
+  const createdRaw = user?.createdAt || user?.created_at;
+  const createdDate = createdRaw ? new Date(createdRaw) : null;
+  const activated = createdDate && !Number.isNaN(createdDate.getTime())
+    ? createdDate.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })
+    : null;
   const current = catalog.find((p) => p.id === planId) || catalog[0];
 
   const [invoiceTick, setInvoiceTick] = useState(0);
@@ -37,8 +42,6 @@ export default function SubscriptionView({ onRequireLogin }) {
 
   return (
     <div className="flex flex-col gap-6 max-w-[1080px]">
-      <PageHeader subtitle="Xem gói học hiện tại, nâng cấp và tra cứu hóa đơn thanh toán." />
-
       <Card className="p-6 sm:p-8 rounded-3xl flex flex-col gap-6">
         <p className="text-xl font-bold text-vp-ink">Trạng thái gói học hiện tại</p>
         <div data-testid="current-plan" className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 rounded-2xl border-[1.5px] border-vp-blue bg-blue-50 p-6">
@@ -49,6 +52,7 @@ export default function SubscriptionView({ onRequireLogin }) {
             </div>
             <p className="font-heading text-2xl font-extrabold text-vp-ink">{current.id === "free" ? "Đang dùng thử miễn phí" : `VietPhonics AI ${current.name}`}</p>
             <p className="text-[13px] text-vp-muted">{current.description}</p>
+            {activated && <p className="text-[13px] text-vp-muted">Ngày kích hoạt: {activated}</p>}
           </div>
           <p className="font-heading text-[32px] font-extrabold text-vp-blue whitespace-nowrap">{current.id === "free" ? "0 VNĐ" : formatVnd(currentPrice)}</p>
         </div>
@@ -84,7 +88,7 @@ export default function SubscriptionView({ onRequireLogin }) {
                 <button
                   disabled={isCurrent || plan.id === "free" || !user}
                   onClick={() => setCheckoutPlan(plan)}
-                  className={`h-11 rounded-full text-sm font-bold ${isCurrent ? "bg-vp-pill text-vp-muted" : "bg-vp-blue text-white hover:brightness-110"}`}
+                  className={`h-11 rounded-full text-sm font-bold ${isCurrent || plan.id === "free" || !user ? "bg-vp-pill text-vp-muted cursor-not-allowed" : "bg-vp-blue text-white hover:brightness-110"}`}
                 >
                   {isCurrent ? "Gói hiện tại" : plan.id === "free" ? "Gói miễn phí" : plan.cta}
                 </button>

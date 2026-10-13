@@ -17,7 +17,7 @@ function getResultBand(score, sensitivity = 50) {
 const BANDS = {
   good: {
     label: "KẾT QUẢ CHÍNH XÁC",
-    card: "bg-emerald-50 border-emerald-500 shadow-[0_12px_12px_rgba(16,185,129,0.11)]",
+    card: "bg-[#ECFDF5] border-emerald-500 shadow-vp-lift",
     accent: "text-emerald-500",
     mascot: "Oa! Bé phát âm siêu quá đi mất! Thật chuẩn giọng luôn.",
     hint: () => "Bé làm tốt lắm! Đúng hoàn toàn rồi.",
@@ -25,7 +25,7 @@ const BANDS = {
   },
   nearly: {
     label: "SẮP HOÀN THÀNH",
-    card: "bg-amber-50 border-amber-400",
+    card: "bg-amber-100 border-amber-500 border-2",
     accent: "text-amber-500",
     mascot: (focus) => `Ối, suýt chút nữa là chuẩn luôn rồi bé ơi! Bé thử điều chỉnh lại âm '${focus}' một xíu nhé!`,
     hint: (tip) => `Gợi ý: ${tip}`,
@@ -33,7 +33,7 @@ const BANDS = {
   },
   needs: {
     label: "CẦN LUYỆN TẬP THÊM",
-    card: "bg-red-50 border-red-400",
+    card: "bg-[#FEF2F2] border-red-500 border-2",
     accent: "text-red-500",
     mascot: (focus) => `Đừng buồn nhé bé yêu! Chúng ta cùng làm quen lại khẩu hình chữ '${focus}' để thử lại rinh cúp nhé.`,
     hint: (tip) => `Gợi ý: ${tip}`,
@@ -101,18 +101,18 @@ export default function AIResultModal({ isOpen, word, result, recording, awarded
   const primary = band === "good" ? onNext : onRetry;
 
   return (
-    <div className="flex flex-col items-center gap-8" data-testid={`result-${band}`}>
+    <div className={`flex flex-col items-center ${band === "good" ? "gap-8" : "gap-6"}`} data-testid={`result-${band}`}>
       <ConfettiCelebration active={band === "good"} />
       <div className="w-full">
         <MascotBubble message={mascotText} listenLabel={band === "good" ? "Nghe Cá Xanh đọc mẫu trước nha" : "Nghe tớ đọc lại xem khác thế nào nha"} />
       </div>
 
-      <div className={`w-full ${band === "good" ? "max-w-[500px]" : ""} rounded-[28px] border-[2.5px] p-6 sm:p-8 flex flex-col items-center gap-5 ${cfg.card}`}>
+      <div className={`w-full ${band === "good" ? "max-w-[500px]" : ""} rounded-[28px] border-[2.5px] p-6 sm:p-8 flex flex-col items-center ${band === "good" ? "gap-5" : "gap-6"} ${cfg.card}`}>
         <div className={`w-full flex items-center justify-between ${cfg.accent}`}>
           <span className="text-[13px] font-bold">{cfg.label}</span>
           <span data-testid="result-score" className="font-heading text-[32px] font-extrabold">{score}%</span>
         </div>
-        <div className="flex flex-col items-center gap-2 py-4">
+        <div className={`flex flex-col items-center gap-2 ${band === "good" ? "py-4" : ""}`}>
           <HighlightedWord word={word.word} highlights={result.letter_highlights} band={band} />
           <p className={`text-base font-bold text-center ${cfg.accent}`}>{cfg.hint(tip)}</p>
           {awarded > 0 && (
@@ -194,7 +194,7 @@ export default function AIResultModal({ isOpen, word, result, recording, awarded
       <button
         data-testid="result-primary"
         onClick={() => { playSoundEffect("click"); primary(); }}
-        className="w-full max-w-[400px] flex items-center justify-center gap-2 rounded-[28px] bg-vp-blue px-12 py-5 font-heading text-xl font-extrabold text-white shadow-[0_8px_8px_rgba(25,120,220,0.25)] hover:brightness-110"
+        className="w-full max-w-[400px] flex items-center justify-center gap-2 rounded-[28px] bg-vp-blue px-12 py-5 font-heading text-xl font-extrabold text-white shadow-vp-cta hover:brightness-110"
       >
         {cfg.cta} {band === "good" ? <ChevronRight className="w-5 h-5" /> : band === "nearly" ? <ArrowRight className="w-5 h-5" /> : null}
       </button>
