@@ -47,6 +47,7 @@ export const VIEW_ROLE = { ...roles, practice: "kid", profile_select: "kid" };
 export const VIEW_TITLE = {
   ...titles,
   kid_dashboard: "Trang chủ",
+  lesson_catalog: "Danh sách bài học",
   parent_dashboard: "Trang chủ",
   parent_progress: "Tiến độ học của bé",
   parent_pronunciation: "Bản đồ ngọng & Phân tích âm chuẩn AI",

@@ -9,8 +9,8 @@ export function MicPermissionScreen({ onRetry }) {
       <h2 className="font-heading text-2xl font-extrabold text-vp-ink">Cấp quyền truy cập</h2>
       <MascotBubble message="Để tớ nghe thấy bé phát âm siêu như thế nào, bé hãy đồng ý cấp quyền microphone cho tớ nha!" />
       <div className="rounded-[28px] border border-vp-border bg-white p-8 shadow-vp-lift flex flex-col items-center gap-6 text-center">
-        <div className="w-[100px] h-[100px] rounded-full bg-vp-blue grid place-items-center shadow-vp-cta">
-          <Mic className="w-12 h-12 text-white" strokeWidth={1.5} />
+        <div className="w-[100px] h-[100px] rounded-full bg-white grid place-items-center shadow-vp-lift">
+          <Mic className="w-12 h-12 text-vp-blue" strokeWidth={1.5} />
         </div>
         <p className="font-heading text-2xl font-extrabold text-vp-ink">Bấm "Cho phép" (Allow) trên màn hình</p>
         <p className="max-w-lg text-[15px] text-[#6B7280]">
@@ -112,7 +112,7 @@ export function RecordingErrorsScreen({ active, onRescan }) {
         return (
           <div
             key={issue.id}
-            className={`rounded-[20px] border-2 bg-white p-6 shadow-vp-lift transition-opacity ${issue.border} ${on ? "" : "opacity-60"}`}
+            className={`rounded-[20px] border-2 bg-white p-6 shadow-vp-lift ${issue.border}`}
           >
             <p className="flex items-center gap-3 text-lg font-bold text-vp-ink">
               <span className={`w-2.5 h-2.5 rounded-full ${issue.dot}`} /> {issue.title}
