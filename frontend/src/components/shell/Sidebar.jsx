@@ -2,7 +2,7 @@ import React from "react";
 import { ArrowLeftRight, X } from "lucide-react";
 import Logo from "./Logo";
 import { HOTLINE } from "../../constants";
-import { NAV_ITEMS } from "./navConfig";
+import { NAV_ITEMS, NAV_ACTIVE_ALIAS } from "./navConfig";
 
 const ROLES = [
   { id: "kid", label: "Bé học" },
@@ -29,13 +29,13 @@ export default function Sidebar({ role, currentView, onNavigate, onSwitchRole, o
 
         <nav className="flex flex-col gap-2">
           {NAV_ITEMS[role].map(({ view, label, icon: Icon }) => {
-            const active = currentView === view;
+            const active = (NAV_ACTIVE_ALIAS[currentView] || currentView) === view;
             return (
               <button
                 key={view}
                 data-testid={`nav-${view}`}
                 onClick={() => { onNavigate(view); onClose(); }}
-                className={`flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] font-medium text-left border transition-colors ${
+                className={`flex items-center gap-3 rounded-xl px-4 py-3 text-[15px] text-left border transition-colors ${active ? "font-bold" : "font-medium"} ${
                   active ? "bg-vp-blue border-vp-blue text-white shadow-vp-drop" : "border-transparent text-vp-ink hover:bg-vp-sky"
                 }`}
               >

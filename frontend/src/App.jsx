@@ -299,6 +299,7 @@ export default function App() {
       return (
         <AppShell
           currentView={currentView}
+          title={currentView === "practice" ? currentLesson?.title : undefined}
           onNavigate={navigate}
           onSwitchRole={(role) => { playSoundEffect("click"); navigate(ROLE_HOME[role]); }}
           onGoHome={() => navigate("landing")}

@@ -3,7 +3,7 @@ import Sidebar from "./Sidebar";
 import TopBar from "./TopBar";
 import { VIEW_ROLE, VIEW_TITLE, VIEW_BACK } from "./navConfig";
 
-export default function AppShell({ currentView, onNavigate, onSwitchRole, onGoHome, onOpenAccount, selectedChild, children }) {
+export default function AppShell({ currentView, title, onNavigate, onSwitchRole, onGoHome, onOpenAccount, selectedChild, children }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const role = VIEW_ROLE[currentView] || "kid";
   const backTo = VIEW_BACK[currentView];
@@ -21,14 +21,14 @@ export default function AppShell({ currentView, onNavigate, onSwitchRole, onGoHo
       />
       <div className="lg:pl-70 min-w-0">
         <TopBar
-          title={VIEW_TITLE[currentView] || ""}
+          title={title || VIEW_TITLE[currentView] || ""}
           child={selectedChild}
           showStats={role === "kid"}
           onBack={backTo ? () => onNavigate(backTo) : undefined}
           onOpenMenu={() => setMenuOpen(true)}
           onOpenAccount={onOpenAccount}
         />
-        <main className="p-4 sm:p-6 lg:p-8">{children}</main>
+        <main className={`p-4 sm:p-6 ${role === "parent" ? "lg:p-10" : "lg:p-8"}`}>{children}</main>
       </div>
     </div>
   );

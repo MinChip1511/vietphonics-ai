@@ -22,7 +22,7 @@ function RoundIcon({ label, onClick, children, className = "grid" }) {
 // Figma TopBar variant "Menu" (node 27:2437): used inside the sidebar shell.
 export default function TopBar({ title, child, showStats, onBack, onOpenMenu, onOpenAccount }) {
   return (
-    <header className="sticky top-0 z-30 bg-white border-b border-vp-border flex items-center gap-4 px-4 py-4 lg:px-8 lg:py-5">
+    <header className="sticky top-0 z-30 bg-white border-b border-vp-border flex items-center gap-4 px-4 py-4 lg:h-[88px] lg:px-8 lg:py-0">
       <button className="lg:hidden p-1 text-vp-ink" onClick={onOpenMenu} aria-label="Mở menu" data-testid="menu-toggle">
         <Menu className="w-6 h-6" />
       </button>

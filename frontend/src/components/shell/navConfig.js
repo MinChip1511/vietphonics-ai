@@ -74,4 +74,7 @@ export const SHELL_VIEWS = new Set(Object.keys(VIEW_ROLE));
 export const ROLE_HOME = { kid: "kid_dashboard", parent: "parent_dashboard", admin: "admin_dashboard" };
 
 // Views without a sidebar entry show a back button that returns to this view.
-export const VIEW_BACK = { practice: "lesson_catalog" };
+export const VIEW_BACK = { practice: "lesson_catalog", lesson_catalog: "kid_dashboard" };
+
+// A practice screen belongs to "Bài học": that sidebar item stays highlighted while a lesson is open.
+export const NAV_ACTIVE_ALIAS = { practice: "lesson_catalog" };

@@ -11,6 +11,9 @@
   --color-vp-pill: #EEEEEE;
   --shadow-vp-drop: 0 1.5px 2px 0 rgb(0 0 0 / 0.05);
   --shadow-vp-card: 0 4px 8px 0 rgb(30 27 75 / 0.03);
+  /* Figma "Shadow" style (drop-shadow 2px 2px 8px) and the primary CTA glow */
+  --shadow-vp-lift: 2px 2px 16px 0 rgb(0 0 0 / 0.2);
+  --shadow-vp-cta: 0 8px 20px 0 rgb(17 76 138 / 0.5);
   --font-heading: "Baloo 2", "Nunito", system-ui, sans-serif;
   --font-vp: "Baloo 2", "Be Vietnam Pro", system-ui, sans-serif;
 }
