@@ -127,7 +127,7 @@ export default function AdminLessonsView() {
   return (
     <div className="max-w-[1200px]">
       <AdminHeader actionLabel="Tạo bài học mới" onAction={newLesson} />
-      <div className="grid gap-5 [&>*]:min-w-0 lg:grid-cols-[1fr_420px] items-start">
+      <div className="grid gap-5 [&>*]:min-w-0 lg:grid-cols-[1fr_346px] items-start">
         <Card flat className="p-6 flex flex-col gap-4">
           <div className="flex flex-wrap gap-2">
             <select aria-label="Lọc nhóm" className={CHIP_SELECT} value={category} onChange={(e) => setCategory(e.target.value)}>

@@ -48,7 +48,7 @@ export default function AdminRevenueView() {
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4 mb-5">
         {kpis.map((k) => (
           <Card flat key={k.label} className="p-5 flex flex-col gap-3">
-            <p className="text-[13px] font-semibold uppercase text-[#94A3B8]">{k.label}</p>
+            <p className="text-xs font-semibold text-[#94A3B8]">{k.label}</p>
             <p data-testid={`rev-${k.label}`} className="font-heading text-[28px] leading-tight font-bold text-[#0F172A]">{k.value}</p>
             <p className="text-xs text-[#475569]">{k.note}</p>
           </Card>

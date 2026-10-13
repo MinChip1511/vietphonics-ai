@@ -28,13 +28,19 @@ export function AdminHeader({ title, subtitle, actionLabel, onAction, extra, ful
         <CalendarDays className="w-4 h-4" /> Hôm nay: {todayLabel()}
       </span>
       {actionLabel && (
-        <button data-testid="admin-primary-action" onClick={onAction} className="flex items-center gap-1.5 rounded-lg bg-vp-blue px-4 py-2 text-sm font-semibold text-white hover:brightness-110">
+        <button data-testid="admin-primary-action" onClick={onAction} className="flex items-center gap-1.5 rounded-full bg-vp-blue px-4 py-2 text-sm font-semibold text-white hover:brightness-110">
           <Plus className="w-4 h-4" /> {actionLabel}
         </button>
       )}
     </div>
   );
-  if (!full) return <div className="flex justify-end mb-2">{chips}</div>;
+  if (!full) {
+    // Figma has no date row on these screens: keep the demo notice (floated into the page padding)
+    // and, where a screen passes one, its action in a slim row.
+    const demo = hasDemo && <span data-testid="demo-chip" title="Hệ thống đang chứa tài khoản và dữ liệu mẫu để thử nghiệm" className="rounded-full bg-amber-100 px-3 py-1.5 text-[11px] font-bold uppercase text-amber-700">Có dữ liệu Demo</span>;
+    if (extra) return <div className="flex justify-end items-center gap-2 mb-3">{demo}{extra}</div>;
+    return demo ? <div className="relative h-0"><div className="absolute right-0 -top-7">{demo}</div></div> : null;
+  }
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between pb-6 mb-6 border-b border-vp-border">
       <div>
@@ -68,7 +74,7 @@ export function Toast({ message, tone = "ok", onDone }) {
 export function KpiCard({ label, value, delta, up, hint }) {
   return (
     <Card flat className="p-5 flex flex-col gap-3">
-      <p className="text-[13px] font-semibold uppercase text-[#94A3B8]">{label}</p>
+      <p className="text-xs font-semibold text-[#94A3B8]">{label}</p>
       <div className="flex items-baseline justify-between gap-2">
         <p className="font-heading text-[28px] leading-tight font-bold text-[#0F172A]">{value}</p>
         {delta && <span className={`text-xs font-bold ${up ? "text-emerald-500" : "text-red-500"}`}>{up ? "↑" : "↓"} {delta.replace(/^[+-]/, "")}</span>}

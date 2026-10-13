@@ -43,7 +43,7 @@ export default function AdminPromotionsView() {
   return (
     <div className="max-w-[1200px]">
       <AdminHeader actionLabel="Tạo mã giảm giá mới" onAction={() => document.getElementById("coupon-code")?.focus()} />
-      <div className="grid gap-5 [&>*]:min-w-0 lg:grid-cols-[1fr_380px] items-start">
+      <div className="grid gap-5 [&>*]:min-w-0 lg:grid-cols-[1fr_300px] items-start">
         <Card flat className="p-6 flex flex-col gap-4">
           <p className={PANEL_TITLE}>Mã ưu đãi đang áp dụng</p>
           <div className={TABLE_WRAP}>
