@@ -24,7 +24,7 @@ export function AdminHeader({ title, subtitle, actionLabel, onAction, extra, ful
     <div className="flex flex-wrap items-center gap-2">
       {extra}
       {hasDemo && <span data-testid="demo-chip" title="Hệ thống đang chứa tài khoản và dữ liệu mẫu để thử nghiệm" className="rounded-full bg-amber-100 px-3 py-1.5 text-[11px] font-bold uppercase text-amber-700">Có dữ liệu Demo</span>}
-      <span className="flex items-center gap-2 rounded-lg border border-vp-border bg-white px-4 py-2 text-sm font-normal text-[#475569]">
+      <span className="flex items-center gap-2 rounded-lg border border-vp-border bg-white px-3 py-1.5 text-[13px] font-normal text-[#475569]">
         <CalendarDays className="w-4 h-4" /> Hôm nay: {todayLabel()}
       </span>
       {actionLabel && (
@@ -34,7 +34,7 @@ export function AdminHeader({ title, subtitle, actionLabel, onAction, extra, ful
       )}
     </div>
   );
-  if (!full) return <div className="flex justify-end mb-3">{chips}</div>;
+  if (!full) return <div className="flex justify-end mb-2">{chips}</div>;
   return (
     <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between pb-6 mb-6 border-b border-vp-border">
       <div>

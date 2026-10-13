@@ -100,7 +100,7 @@ export default function WordPractice({ lesson, aiEnabled = true, childId, onFini
   }[phase];
 
   return (
-    <div className="flex flex-col items-center gap-8" data-testid={`practice-phase-${phase}`}>
+    <div className="flex flex-col items-center gap-6" data-testid={`practice-phase-${phase}`}>
       <div className="w-full">
         <MascotBubble message={mascotMessage} listenLabel="Nghe Cá Xanh đọc mẫu trước nha" />
       </div>
@@ -157,7 +157,7 @@ export default function WordPractice({ lesson, aiEnabled = true, childId, onFini
       {phase === "listen" && (
         <>
           <div className="w-full max-w-[500px] rounded-[32px] border-2 border-vp-sky bg-white p-8 flex flex-col items-center gap-6 shadow-vp-lift">
-            <div className="w-full h-[200px] rounded-2xl bg-vp-sky grid place-items-center">
+            <div className="w-full h-[160px] rounded-2xl bg-vp-sky grid place-items-center">
               <span className="text-8xl" aria-hidden="true">{word.illustration}</span>
             </div>
             <p className="text-xs font-bold uppercase text-vp-blue mt-2">Từ khóa bài học</p>
@@ -189,7 +189,7 @@ export default function WordPractice({ lesson, aiEnabled = true, childId, onFini
 
       {phase === "ready" && (
         <>
-          <div className="w-full max-w-[500px] rounded-[24px] border-[1.5px] border-vp-sky bg-white p-8 shadow-vp-lift flex flex-col items-center gap-3">
+          <div className="w-full max-w-[500px] rounded-[24px] border-[1.5px] border-vp-sky bg-white px-8 py-10 shadow-vp-lift flex flex-col items-center gap-3">
             <p className="text-base font-semibold text-vp-muted">BÉ HÃY ĐỌC TO:</p>
             <p className="font-heading text-5xl font-extrabold text-vp-ink text-center">{word.word}</p>
           </div>
@@ -253,7 +253,7 @@ export default function WordPractice({ lesson, aiEnabled = true, childId, onFini
       )}
 
       {phase === "processing" && (
-        <div data-testid="ai-processing" className="w-full max-w-[480px] rounded-[28px] border border-[#E4E4E7] bg-white p-12 shadow-vp-lift flex flex-col items-center gap-8">
+        <div data-testid="ai-processing" className="w-full max-w-[480px] rounded-[28px] border border-[#E4E4E7] bg-white p-12 shadow-vp-lift flex flex-col items-center gap-5">
           <div className="w-[120px] h-[120px] rounded-full bg-[#EFF6FF] grid place-items-center">
             <Loader className="w-14 h-14 text-vp-blue animate-spin" />
           </div>

@@ -149,7 +149,7 @@ export default function AdminLessonsView() {
                   <tr key={l.id} data-testid={`lesson-row-${l.id}`} onClick={() => { setDraft(null); setSelectedId(l.id); }} className={`cursor-pointer ${TR} ${l.id === selectedId && !draft ? "bg-vp-sky/40" : "hover:bg-vp-canvas/60"}`}>
                     <td className={`${TD} font-semibold text-[#1978DC] whitespace-nowrap`} title={l.id}>{shortId(l.id)}</td>
                     <td className={TD}><p className="font-semibold text-[#0F172A]">{l.title}</p>{l.updated_at && <p className="text-[11px] text-[#94A3B8] whitespace-nowrap">Cập nhật mới nhất: {timeAgo(l.updated_at)}</p>}</td>
-                    <td className={`${TD} text-[#475569]`}>{categoryName(l.category)}</td>
+                    <td className={`${TD} text-[#475569] whitespace-nowrap`}>{categoryName(l.category)}</td>
                     <td className={`${TD} text-[#475569] whitespace-nowrap`}>{l.difficulty}</td>
                     <td className={`${TD} text-[#475569] whitespace-nowrap`}>{l.words.length} từ</td>
                     <td className={TD}><StatusBadge map={LESSON_STATUS} status={l.status} /></td>
