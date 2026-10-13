@@ -5,15 +5,17 @@ import { assetUrl } from "../services/apiClient";
 // balance and owned list (see views/RewardsView.jsx).
 export default function RewardCard({ reward, owned, balance, onRedeem }) {
   const locked = !owned && reward.cost > balance;
+  // Figma tile colours: owned = green, can be redeemed = blue, not enough points = grey.
+  const tile = owned ? "bg-[#ECFDF5]" : locked ? "bg-[#E4E4E7]" : "bg-[#DDF5FF]";
 
   return (
     <article
       data-testid={`reward-${reward.id}`}
-      className={`content-stretch flex w-full min-w-0 flex-1 flex-col items-start gap-3 rounded-[20px] border p-4 md:w-auto ${
+      className={`content-stretch flex w-full min-w-0 flex-1 flex-col items-start gap-3 rounded-[20px] border p-4 drop-shadow-[2px_2px_8px_rgba(0,0,0,0.2)] md:w-auto ${
         owned ? "border-[1.5px] border-[#10B981] bg-white" : "border border-[#E4E4E7] bg-white"
-      } ${locked ? "opacity-60" : ""}`}
+      }`}
     >
-      <div className="flex h-[120px] w-full shrink-0 items-center justify-center overflow-hidden rounded-[12px] bg-[#DDF5FF]">
+      <div className={`flex h-[120px] w-full shrink-0 items-center justify-center overflow-hidden rounded-[12px] ${tile}`}>
         {reward.image ? (
           <img src={assetUrl(reward.image)} alt={reward.title} className="h-full w-full object-cover" />
         ) : (

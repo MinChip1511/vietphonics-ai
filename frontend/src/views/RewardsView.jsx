@@ -69,7 +69,7 @@ export default function RewardsView({ selectedChild, onProfileChange }) {
           ))}
         </section>
 
-        <section className="content-stretch flex w-full flex-col items-start gap-4 rounded-[24px] border border-[#E4E4E7] bg-white p-6 leading-normal">
+        <section className="content-stretch flex w-full flex-col items-start gap-4 rounded-[24px] border border-[#E4E4E7] bg-white p-6 leading-normal drop-shadow-[2px_2px_8px_rgba(0,0,0,0.2)]">
           <h2 className="font-baloo text-xl font-bold leading-normal text-[#0D3577]">Bảng vàng của gia đình</h2>
           <ol className="flex w-full flex-col items-start gap-3">
             {data?.leaderboard.map((entry) => (
