@@ -7,8 +7,8 @@ export const NAV_ITEMS = {
   kid: [
     { view: "kid_dashboard", label: "Trang chủ", icon: LayoutGrid },
     { view: "lesson_catalog", label: "Bài học", icon: BookOpen },
-    { view: "rewards", label: "Cúp của bé", icon: Trophy },
-    { view: "kid_progress", label: "Hồ sơ của bé", icon: CircleUser }
+    { view: "kid_progress", label: "Cúp của bé", icon: Trophy },
+    { view: "rewards", label: "Hồ sơ của bé", icon: CircleUser }
   ],
   parent: [
     { view: "parent_dashboard", label: "Trang chủ", icon: LayoutGrid },

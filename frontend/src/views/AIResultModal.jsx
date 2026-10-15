@@ -151,11 +151,24 @@ export default function AIResultModal({ isOpen, word, result, recording, awarded
         </div>
       </div>
 
+      <button
+        data-testid="result-primary"
+        onClick={() => { playSoundEffect("click"); primary(); }}
+        className="w-full max-w-[400px] flex items-center justify-center gap-2 rounded-[28px] bg-vp-blue px-12 py-5 font-heading text-xl font-extrabold text-white shadow-vp-cta hover:brightness-110"
+      >
+        {cfg.cta} {band === "good" ? <ChevronRight className="w-5 h-5" /> : band === "nearly" ? <ArrowRight className="w-5 h-5" /> : null}
+      </button>
+      {band !== "good" && (
+        <button onClick={() => { playSoundEffect("click"); onNext(); }} className="text-xs font-semibold text-vp-muted hover:text-vp-blue">
+          Bỏ qua, sang từ tiếp theo
+        </button>
+      )}
+
       {rows.length > 0 && (
-        <div className="w-full max-w-[700px]">
+        <div className="w-full max-w-[700px] text-xs">
           <button
             onClick={() => setShowDetails(!showDetails)}
-            className="mx-auto flex items-center gap-1 text-sm font-semibold text-vp-blue"
+            className="mx-auto flex items-center gap-1 text-xs font-semibold text-vp-muted hover:text-vp-blue"
           >
             Chi tiết từng âm <ChevronDown className={`w-4 h-4 transition-transform ${showDetails ? "rotate-180" : ""}`} />
           </button>
@@ -191,18 +204,6 @@ export default function AIResultModal({ isOpen, word, result, recording, awarded
         </div>
       )}
 
-      <button
-        data-testid="result-primary"
-        onClick={() => { playSoundEffect("click"); primary(); }}
-        className="w-full max-w-[400px] flex items-center justify-center gap-2 rounded-[28px] bg-vp-blue px-12 py-5 font-heading text-xl font-extrabold text-white shadow-vp-cta hover:brightness-110"
-      >
-        {cfg.cta} {band === "good" ? <ChevronRight className="w-5 h-5" /> : band === "nearly" ? <ArrowRight className="w-5 h-5" /> : null}
-      </button>
-      {band !== "good" && (
-        <button onClick={() => { playSoundEffect("click"); onNext(); }} className="-mt-4 text-sm font-semibold text-vp-muted hover:text-vp-blue">
-          Bỏ qua, sang từ tiếp theo
-        </button>
-      )}
     </div>
   );
 }

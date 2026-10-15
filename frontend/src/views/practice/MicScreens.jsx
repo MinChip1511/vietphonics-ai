@@ -5,8 +5,7 @@ import MascotBubble from "../../components/MascotBubble";
 // Figma: 03 Child UX / 12 / microphone-permission (27:2469)
 export function MicPermissionScreen({ onRetry }) {
   return (
-    <div className="flex flex-col gap-6 min-h-[60vh]" data-testid="mic-permission">
-      <h2 className="font-heading text-2xl font-extrabold text-vp-ink">Cấp quyền truy cập</h2>
+    <div className="flex flex-col gap-6 min-h-[calc(100vh-10rem)]" data-testid="mic-permission">
       <MascotBubble message="Để tớ nghe thấy bé phát âm siêu như thế nào, bé hãy đồng ý cấp quyền microphone cho tớ nha!" />
       <div className="rounded-[28px] border border-vp-border bg-white p-8 shadow-vp-lift flex flex-col items-center gap-6 text-center">
         <div className="w-[100px] h-[100px] rounded-full bg-white grid place-items-center shadow-vp-lift">
@@ -15,7 +14,6 @@ export function MicPermissionScreen({ onRetry }) {
         <p className="font-heading text-2xl font-extrabold text-vp-ink">Bấm "Cho phép" (Allow) trên màn hình</p>
         <p className="max-w-lg text-[15px] text-[#6B7280]">
           Trình duyệt hoặc hệ thống sẽ hiện ra một thông báo nhỏ yêu cầu quyền thu âm. Phụ huynh hãy xác nhận "Cho phép" để tiếp tục.
-          Nếu đã lỡ chặn, hãy bấm biểu tượng ổ khóa cạnh thanh địa chỉ để bật lại micro.
         </p>
       </div>
       <button
@@ -105,8 +103,7 @@ export function RecordingErrorsScreen({ active, onRescan }) {
   const issues = [...EXTRA_ISSUES.filter((i) => flagged.includes(i.id)), ...ISSUES];
 
   return (
-    <div className="flex flex-col gap-6 min-h-[60vh]" data-testid="recording-errors">
-      <h2 className="font-heading text-[28px] font-extrabold text-vp-ink">Chuẩn đoán môi trường học</h2>
+    <div className="flex flex-col gap-6 min-h-[calc(100vh-10rem)]" data-testid="recording-errors">
       {issues.map((issue) => {
         const on = flagged.includes(issue.id);
         return (

@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { playSoundEffect } from "../services/audioService";
 import { Tabs } from "../components/ui";
 import WordPractice from "./practice/WordPractice";
@@ -16,8 +16,16 @@ const STAGES = [
   { id: "sentences", label: "Luyện câu" }
 ];
 
-export default function PracticeStudioView({ lesson, aiEnabled = true, childId, onBack, onFinishExercise }) {
+export default function PracticeStudioView({ lesson, aiEnabled = true, childId, onBack, onFinishExercise, onTitleChange }) {
   const [stage, setStage] = useState("words");
+
+  const [phase, setPhase] = useState("intro");
+  const onPhaseChange = useCallback((p) => {
+    setPhase(p);
+    onTitleChange?.(p === "mic-permission" ? "Cấp quyền truy cập" : p === "recording-errors" ? "Kiểm tra môi trường học" : undefined);
+  }, [onTitleChange]);
+
+  useEffect(() => () => onTitleChange?.(undefined), [onTitleChange]);
 
   const go = (id) => {
     playSoundEffect("click");
@@ -26,15 +34,20 @@ export default function PracticeStudioView({ lesson, aiEnabled = true, childId, 
 
   return (
     <div className="flex flex-col gap-6 max-w-[1096px]">
-      <div className="flex flex-wrap items-end justify-between gap-3">
-        <div>
-          <p className="text-xs font-bold uppercase text-vp-blue">{lesson?.categoryName} · Level {lesson?.level ?? 1}</p>
+      {stage !== "words" && (
+        <div className="flex flex-wrap items-end justify-between gap-3">
           <h2 className="font-heading text-2xl font-extrabold text-vp-ink">{lesson?.title}</h2>
+          <Tabs tabs={STAGES} value={stage} onChange={go} />
         </div>
-        <Tabs tabs={STAGES} value={stage} onChange={go} />
-      </div>
+      )}
 
-      {stage === "words" && <WordPractice lesson={lesson} aiEnabled={aiEnabled} childId={childId} onFinishExercise={onFinishExercise} />}
+      {stage === "words" && <WordPractice lesson={lesson} aiEnabled={aiEnabled} childId={childId} onFinishExercise={onFinishExercise} onPhaseChange={onPhaseChange} />}
+      {stage === "words" && phase === "intro" && (
+        <div className="flex flex-col items-center gap-2" data-testid="practice-more">
+          <p className="text-xs font-semibold text-vp-muted">Bài tập khác trong bài học</p>
+          <Tabs tabs={STAGES} value={stage} onChange={go} />
+        </div>
+      )}
       {stage === "warmup" && <WarmupStage lesson={lesson} onNext={() => go("discriminate")} />}
       {stage === "discriminate" && <DiscriminateStage lesson={lesson} onNext={() => go("mouth")} />}
       {stage === "mouth" && <MouthStage lesson={lesson} onNext={() => go("syllables")} />}

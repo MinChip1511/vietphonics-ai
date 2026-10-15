@@ -147,6 +147,8 @@ export default function App() {
     navigate("kid_dashboard");
   };
 
+  const [practiceTitle, setPracticeTitle] = useState();
+
   const handleStartLesson = (lessonId, category = "all") => {
     playSoundEffect("click");
     setCurrentLessonId(lessonId);
@@ -175,7 +177,7 @@ export default function App() {
     if (!result.attempt_id) return;
     recordPracticeSession(childId, result.attempt_id)
       .then((saved) => {
-        store.applyChild(saved.updated_child);
+        if (saved.updated_child) store.applyChild(saved.updated_child);
         setAiModalState((prev) => (prev.result === result ? { ...prev, awarded: saved.stars_awarded } : prev));
       })
       .catch((err) => console.warn("Chưa lưu được kết quả luyện tập:", err));
@@ -234,6 +236,7 @@ export default function App() {
                 childId={selectedChild?.id}
                 onBack={() => navigate("kid_dashboard")}
                 onFinishExercise={handleOpenExerciseResult}
+                onTitleChange={setPracticeTitle}
               />
             </div>
           </>
@@ -299,7 +302,7 @@ export default function App() {
       return (
         <AppShell
           currentView={currentView}
-          title={currentView === "practice" ? currentLesson?.title : undefined}
+          title={currentView === "practice" ? practiceTitle || currentLesson?.title : undefined}
           onNavigate={navigate}
           onSwitchRole={(role) => { playSoundEffect("click"); navigate(ROLE_HOME[role]); }}
           onGoHome={() => navigate("landing")}

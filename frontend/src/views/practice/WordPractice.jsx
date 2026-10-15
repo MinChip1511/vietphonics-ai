@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { Volume2, ArrowRight, ChevronRight, Mic, Square, Loader, ChevronLeft } from "lucide-react";
 import MascotBubble from "../../components/MascotBubble";
 import { speakVietnamese, playSoundEffect } from "../../services/audioService";
@@ -27,7 +27,7 @@ function focusSyllable(word) {
   return parts[parts.length - 1];
 }
 
-export default function WordPractice({ lesson, aiEnabled = true, childId, onFinishExercise }) {
+export default function WordPractice({ lesson, aiEnabled = true, childId, onFinishExercise, onPhaseChange }) {
   const words = lesson?.words || [];
   const [index, setIndex] = useState(0);
   const [step, setPhase] = useState("intro");
@@ -70,6 +70,11 @@ export default function WordPractice({ lesson, aiEnabled = true, childId, onFini
   // While the recorder is live the screen is recording-active; while it converts the audio it is already processing.
   const phase = recorder.status === "recording" ? "recording" : recorder.status === "finishing" ? "processing" : step;
 
+  const reported = recorder.error === "permission" ? "mic-permission" : recorder.error ? "recording-errors" : phase;
+  useEffect(() => {
+    onPhaseChange?.(reported);
+  }, [reported, onPhaseChange]);
+
   if (!word) {
     return <p className="text-vp-muted">Bài học này chưa có từ vựng để luyện.</p>;
   }
@@ -99,33 +104,33 @@ export default function WordPractice({ lesson, aiEnabled = true, childId, onFini
     processing: "Chờ tớ tí tẹo nhé bé yêu ơi! Cá Xanh đang lắng nghe rất kỹ phát âm của con..."
   }[phase];
 
+  const pager = (
+    <div className="absolute right-4 top-4 flex items-center gap-1 text-xs font-semibold text-vp-muted">
+      <button
+        aria-label="Từ trước"
+        disabled={index === 0}
+        onClick={() => { setIndex(index - 1); setPhase("listen"); }}
+        className="w-6 h-6 grid place-items-center rounded-full hover:bg-vp-sky disabled:opacity-30"
+      >
+        <ChevronLeft className="w-4 h-4" />
+      </button>
+      <span>{index + 1}/{words.length}</span>
+      <button
+        aria-label="Từ sau"
+        disabled={index === words.length - 1}
+        onClick={() => { setIndex(index + 1); setPhase("listen"); }}
+        className="w-6 h-6 grid place-items-center rounded-full hover:bg-vp-sky disabled:opacity-30"
+      >
+        <ChevronRight className="w-4 h-4" />
+      </button>
+    </div>
+  );
+
   return (
     <div className="flex flex-col items-center gap-6" data-testid={`practice-phase-${phase}`}>
       <div className="w-full">
         <MascotBubble message={mascotMessage} listenLabel="Nghe Cá Xanh đọc mẫu trước nha" />
       </div>
-
-      {phase !== "intro" && (
-        <div className="flex items-center gap-3 text-sm font-semibold text-vp-muted">
-          <button
-            aria-label="Từ trước"
-            disabled={index === 0 || phase === "recording" || phase === "processing"}
-            onClick={() => { setIndex(index - 1); setPhase("listen"); }}
-            className="w-8 h-8 grid place-items-center rounded-full bg-white border border-vp-border disabled:opacity-30"
-          >
-            <ChevronLeft className="w-4 h-4" />
-          </button>
-          <span>Từ {index + 1} / {words.length}</span>
-          <button
-            aria-label="Từ sau"
-            disabled={index === words.length - 1 || phase === "recording" || phase === "processing"}
-            onClick={() => { setIndex(index + 1); setPhase("listen"); }}
-            className="w-8 h-8 grid place-items-center rounded-full bg-white border border-vp-border disabled:opacity-30"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
-        </div>
-      )}
 
       {phase === "intro" && (
         <>
@@ -156,7 +161,8 @@ export default function WordPractice({ lesson, aiEnabled = true, childId, onFini
 
       {phase === "listen" && (
         <>
-          <div className="w-full max-w-[500px] rounded-[32px] border-2 border-vp-sky bg-white p-8 flex flex-col items-center gap-6 shadow-vp-lift">
+          <div className="w-full max-w-[500px] relative rounded-[32px] border-2 border-vp-sky bg-white p-8 flex flex-col items-center gap-6 shadow-vp-lift">
+            {pager}
             <div className="w-full h-[160px] rounded-2xl bg-vp-sky grid place-items-center">
               <span className="text-8xl" aria-hidden="true">{word.illustration}</span>
             </div>
@@ -189,7 +195,8 @@ export default function WordPractice({ lesson, aiEnabled = true, childId, onFini
 
       {phase === "ready" && (
         <>
-          <div className="w-full max-w-[500px] rounded-[24px] border-[1.5px] border-vp-sky bg-white px-8 py-10 shadow-vp-lift flex flex-col items-center gap-3">
+          <div className="w-full max-w-[500px] relative rounded-[24px] border-[1.5px] border-vp-sky bg-white px-8 py-10 shadow-vp-lift flex flex-col items-center gap-3">
+            {pager}
             <p className="text-base font-semibold text-vp-muted">BÉ HÃY ĐỌC TO:</p>
             <p className="font-heading text-5xl font-extrabold text-vp-ink text-center">{word.word}</p>
           </div>
