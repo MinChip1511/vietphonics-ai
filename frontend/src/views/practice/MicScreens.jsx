@@ -104,6 +104,7 @@ export function RecordingErrorsScreen({ active, onRescan }) {
 
   return (
     <div className="flex flex-col gap-6 min-h-[calc(100vh-10rem)]" data-testid="recording-errors">
+      <h2 className="font-heading text-[28px] font-extrabold text-vp-ink">Chuẩn đoán môi trường học</h2>
       {issues.map((issue) => {
         const on = flagged.includes(issue.id);
         return (

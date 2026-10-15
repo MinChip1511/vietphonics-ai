@@ -101,7 +101,7 @@ export default function AIResultModal({ isOpen, word, result, recording, awarded
   const primary = band === "good" ? onNext : onRetry;
 
   return (
-    <div className={`flex flex-col items-center ${band === "good" ? "gap-8" : "gap-6"}`} data-testid={`result-${band}`}>
+    <div className={`flex flex-col items-center ${band === "good" ? "gap-8" : "gap-6 min-h-[calc(100vh-10rem)]"}`} data-testid={`result-${band}`}>
       <ConfettiCelebration active={band === "good"} />
       <div className="w-full">
         <MascotBubble message={mascotText} listenLabel={band === "good" ? "Nghe Cá Xanh đọc mẫu trước nha" : "Nghe tớ đọc lại xem khác thế nào nha"} />
@@ -154,7 +154,7 @@ export default function AIResultModal({ isOpen, word, result, recording, awarded
       <button
         data-testid="result-primary"
         onClick={() => { playSoundEffect("click"); primary(); }}
-        className="w-full max-w-[400px] flex items-center justify-center gap-2 rounded-[28px] bg-vp-blue px-12 py-5 font-heading text-xl font-extrabold text-white shadow-vp-cta hover:brightness-110"
+        className={`w-full max-w-[400px] flex items-center justify-center gap-2 rounded-[28px] bg-vp-blue px-12 py-5 font-heading text-xl font-extrabold text-white shadow-vp-cta hover:brightness-110 ${band === "good" ? "" : "mt-auto"}`}
       >
         {cfg.cta} {band === "good" ? <ChevronRight className="w-5 h-5" /> : band === "nearly" ? <ArrowRight className="w-5 h-5" /> : null}
       </button>

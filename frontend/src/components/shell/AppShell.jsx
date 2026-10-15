@@ -4,11 +4,11 @@ import TopBar from "./TopBar";
 import { VIEW_ROLE, VIEW_TITLE, VIEW_BACK } from "./navConfig";
 import { VIEW_BACKGROUND } from "./backgrounds";
 
-export default function AppShell({ currentView, title, onNavigate, onSwitchRole, onGoHome, onOpenAccount, selectedChild, children }) {
+export default function AppShell({ currentView, title, scene, onNavigate, onSwitchRole, onGoHome, onOpenAccount, selectedChild, children }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const role = VIEW_ROLE[currentView] || "kid";
   const backTo = VIEW_BACK[currentView];
-  const bg = role === "kid" ? VIEW_BACKGROUND[currentView] : null;
+  const bg = role === "kid" ? VIEW_BACKGROUND[scene || currentView] : null;
 
   return (
     <div className="min-h-screen bg-vp-canvas font-vp text-vp-ink">
