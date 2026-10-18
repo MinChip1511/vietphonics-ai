@@ -20,6 +20,7 @@ import demo2 from "../assets/landing/demo-2.jpg";
 import demo3 from "../assets/landing/demo-3.jpg";
 import testimonial1 from "../assets/landing/testimonial-1.png";
 import testimonial2 from "../assets/landing/testimonial-2.png";
+import testimonial3 from "../assets/landing/avatar-3.png";
 import footerPhoto from "../assets/landing/footer-photo.jpg";
 import socialIcons from "../assets/landing/social-icons.svg";
 
@@ -285,19 +286,21 @@ function Principles() {
 
 function Testimonials({ onStartLearning }) {
   const quotes = [
-    { img: testimonial1, text: "“Con gái tôi trước đây thường cảm thấy chán nản, nhưng giờ đây nó mong chờ thời gian học của mình”", by: "Chị Nguyễn Kim Dung" },
-    { img: testimonial2, text: "“Con trai tôi thường bị thiếu tập trung lúc học, nhưng giờ đây em có thể tập trung một cách dễ dàng”", by: "Chị Phạm Quỳnh Loan" }
+    { img: testimonial1, topic: "Cả nhà cùng sửa giọng", text: "“Có hôm app chỉ ra con đọc ‘lo’ thành ‘no’, tôi mới giật mình vì chính mình cũng hay nói vậy. Giờ hai mẹ con cùng sửa, thỉnh thoảng con còn nhắc lại mẹ.”", by: "Chị Lê Thu Hà, mẹ bé 5 tuổi" },
+    { img: testimonial2, topic: "Hiểu con hơn qua báo cáo", text: "“Trước tôi chỉ biết con đọc chưa đúng chứ không biết sai chỗ nào. Xem báo cáo mới biết con đang yếu vần ‘uôn’. Tối đó hai mẹ con chơi đố vần với nhau luôn.”", by: "Chị Trần Minh Anh, mẹ bé 6 tuổi" },
+    { img: testimonial3, topic: "Niềm vui chung của cả nhà", text: "“Con thích nhất lúc khoe sao vừa nhận được. Tôi thì thích lúc con kéo tay: ‘Mẹ đọc thử đi, xem cá heo chấm mẹ mấy sao’.”", by: "Chị Vũ Ngọc Lan, mẹ bé 4 tuổi" }
   ];
   return (
     <section className="flex flex-col gap-8">
       <h2 className={`font-heading font-semibold leading-[1.3] ${INK} text-4xl sm:text-5xl lg:text-[70px] max-w-[846px]`}>An tâm để bé học, yên tâm để ba mẹ đồng hành</h2>
       <PillButton onClick={onStartLearning} className="self-start">Bắt đầu ngay</PillButton>
-      <div className="grid gap-5 lg:grid-cols-2">
+      <div className="grid gap-5 lg:grid-cols-3">
         {quotes.map((q) => (
-          <figure key={q.by} className="rounded-[20px] bg-white p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center gap-6 min-h-[256px]">
-            <img src={q.img} alt={q.by} className="w-[100px] h-[100px] rounded-full object-cover shrink-0" />
+          <figure key={q.topic} className="rounded-[20px] bg-white p-6 sm:p-8 flex flex-col items-start gap-5">
+            <img src={q.img} alt="" className="w-[100px] h-[100px] rounded-full object-cover shrink-0" />
             <div className="flex flex-col gap-4">
-              <blockquote className={`text-xl leading-[1.3] ${INK}`}>{q.text}</blockquote>
+              <p className="text-xs font-bold uppercase tracking-wide text-vp-blue">{q.topic}</p>
+              <blockquote className={`text-lg leading-[1.4] ${INK}`}>{q.text}</blockquote>
               <span className="border-t border-dashed border-slate-300" />
               <figcaption className={`text-xs ${INK}`}>{q.by}</figcaption>
             </div>

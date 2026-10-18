@@ -43,9 +43,18 @@ export default function PracticeStudioView({ lesson, aiEnabled = true, childId, 
 
       {stage === "words" && <WordPractice lesson={lesson} aiEnabled={aiEnabled} childId={childId} onFinishExercise={onFinishExercise} onPhaseChange={onPhaseChange} />}
       {stage === "words" && phase === "intro" && (
-        <div className="flex flex-col items-center gap-2" data-testid="practice-more">
-          <p className="text-xs font-semibold text-vp-muted">Bài tập khác trong bài học</p>
-          <Tabs tabs={STAGES} value={stage} onChange={go} />
+        <div className="-mt-3 flex justify-center" data-testid="practice-more">
+          <div className="inline-flex max-w-full items-center gap-0.5 overflow-x-auto rounded-full bg-white/85 p-1 shadow-vp-drop backdrop-blur-sm" role="group" aria-label="Bài tập khác trong bài học">
+            {STAGES.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => go(t.id)}
+                className={`h-6 shrink-0 whitespace-nowrap rounded-full px-2.5 text-[11px] font-semibold ${stage === t.id ? "bg-vp-blue text-white" : "text-vp-ink hover:bg-vp-sky"}`}
+              >
+                {t.label}
+              </button>
+            ))}
+          </div>
         </div>
       )}
       {stage === "warmup" && <WarmupStage lesson={lesson} onNext={() => go("discriminate")} />}

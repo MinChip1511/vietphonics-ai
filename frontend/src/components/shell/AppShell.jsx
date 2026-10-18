@@ -31,7 +31,7 @@ export default function AppShell({ currentView, title, scene, onNavigate, onSwit
       )}
       <div className="lg:pl-70 min-w-0 relative z-10">
         <TopBar
-          title={title || VIEW_TITLE[currentView] || ""}
+          title={title ?? VIEW_TITLE[currentView] ?? ""}
           child={selectedChild}
           showStats={role === "kid"}
           onBack={backTo ? () => onNavigate(backTo) : undefined}

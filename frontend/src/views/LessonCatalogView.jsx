@@ -1,9 +1,8 @@
 import React, { useState } from "react";
-import { BookOpen, Lock, Clock } from "lucide-react";
+import { BookOpen, Lock } from "lucide-react";
 import { playSoundEffect } from "../services/audioService";
 import MascotBubble from "../components/MascotBubble";
 import { MASCOT_NAME } from "../constants";
-import { Tabs } from "../components/ui";
 import { lessonStates } from "../data/lessonProgress";
 import { useStore } from "../services/store";
 
@@ -31,12 +30,23 @@ export default function LessonCatalogView({ onSelectLesson, initialCategory = "a
 
   return (
     <div className="flex flex-col gap-6 max-w-[1096px]">
-      <MascotBubble
-        name={MASCOT_NAME}
-        message="Bé hãy chọn một bài học màu xanh rực rỡ để bắt đầu thử thách tiếp theo nhé!"
-      />
-
-      <Tabs tabs={tabs} value={category} onChange={setCategory} />
+      <div className="relative">
+        <MascotBubble
+          name={MASCOT_NAME}
+          message="Bé hãy chọn một bài học màu xanh rực rỡ để bắt đầu thử thách tiếp theo nhé!"
+        />
+        {tabs.length > 2 && (
+          <select
+            data-testid="category-filter"
+            aria-label="Lọc theo nhóm bài"
+            value={category}
+            onChange={(e) => setCategory(e.target.value)}
+            className="absolute top-3 right-3 max-w-[40%] rounded-full border border-vp-border bg-white/90 px-3 py-1 text-xs font-semibold text-vp-ink"
+          >
+            {tabs.map((t) => <option key={t.id} value={t.id}>{t.label}</option>)}
+          </select>
+        )}
+      </div>
       {catalog.error && <p role="alert" className="rounded-xl bg-red-50 px-4 py-2 text-sm font-semibold text-red-500">{catalog.error}</p>}
       {catalog.loaded && !catalog.error && lessons.length === 0 && <p className="text-vp-muted">Chưa có bài học nào trong nhóm này.</p>}
 
@@ -58,7 +68,7 @@ export default function LessonCatalogView({ onSelectLesson, initialCategory = "a
                 {locked ? (
                   <Lock className="w-12 h-12 text-slate-400" strokeWidth={1.5} />
                 ) : (
-                  <span className="text-5xl" aria-hidden="true">{lesson.icon || <BookOpen className="w-12 h-12 text-vp-blue" />}</span>
+                  <BookOpen className="w-12 h-12 text-vp-blue" strokeWidth={1.5} aria-hidden="true" />
                 )}
               </div>
               <div className="flex flex-col gap-1.5 w-full">
@@ -68,9 +78,6 @@ export default function LessonCatalogView({ onSelectLesson, initialCategory = "a
                 </div>
                 <p className={`font-heading text-xl font-extrabold text-[#0D3577]`}>
                   {lesson.title.replace(/^Bài \d+: /, "")}
-                </p>
-                <p className="flex items-center gap-1.5 text-xs text-vp-muted">
-                  <Clock className="w-3.5 h-3.5" /> {lesson.duration} · {lesson.difficulty} · {lesson.categoryName}
                 </p>
               </div>
             </button>

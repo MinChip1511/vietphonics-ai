@@ -51,15 +51,7 @@ export default function KidDashboardView({ selectedChild, onStartLesson, onViewA
 
       {/* Programs */}
       <section>
-        <SectionTitle
-          action={
-            <button onClick={onViewAllLessons} className="flex items-center gap-1 text-sm font-semibold text-vp-blue hover:underline">
-              Tất cả bài học <ChevronRight className="w-4 h-4" />
-            </button>
-          }
-        >
-          Chương trình học vần
-        </SectionTitle>
+        <SectionTitle>Chương trình học vần</SectionTitle>
         <div className="grid gap-4 sm:grid-cols-2">
           {PROGRAMS.map(({ id, name, desc, icon: Icon, bg }) => (
             <Card

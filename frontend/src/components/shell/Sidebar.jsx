@@ -16,7 +16,7 @@ export default function Sidebar({ role, currentView, onNavigate, onSwitchRole, o
       {open && <div className="fixed inset-0 z-40 bg-vp-ink/30 lg:hidden" onClick={onClose} />}
       <aside
         data-testid="sidebar"
-        className={`fixed inset-y-0 left-0 z-50 w-70 overflow-y-auto bg-white border-r border-vp-border p-8 flex flex-col gap-10 transition-transform duration-200 lg:translate-x-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-70 overflow-y-auto bg-white border-r border-vp-border px-8 pt-[37px] pb-8 flex flex-col gap-10 transition-transform duration-200 lg:translate-x-0 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >
@@ -27,7 +27,7 @@ export default function Sidebar({ role, currentView, onNavigate, onSwitchRole, o
           </button>
         </div>
 
-        <nav className="flex flex-col gap-2">
+        <nav className="flex flex-col gap-2 mt-0.5">
           {NAV_ITEMS[role].map(({ view, label, icon: Icon }) => {
             const active = (NAV_ACTIVE_ALIAS[currentView] || currentView) === view;
             return (

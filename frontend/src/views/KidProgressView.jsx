@@ -1,6 +1,6 @@
-import React from "react";
+import React, { useState } from "react";
 import { Sparkles, Award, SmilePlus, Flame, Target, Lock, Play } from "lucide-react";
-import { Card, ProgressBar } from "../components/ui";
+import { ProgressBar } from "../components/ui";
 import { useStore } from "../services/store";
 
 // Figma: 03 Child UX / 14 (17) / points-streak-badges (7:803)
@@ -24,79 +24,101 @@ function lessonFor(sound, lessons) {
   return lessons.find((l) => l.category === SOUND_CATEGORY[sound]) || lessons[0];
 }
 
+const CARD = "rounded-[20px] border border-[#E4E4E7] bg-white drop-shadow-[2px_2px_8px_rgba(0,0,0,0.2)]";
+
 export default function KidProgressView({ selectedChild, onGoToLesson }) {
   const { catalog } = useStore();
+  const [showAllBadges, setShowAllBadges] = useState(false);
+  const [showMore, setShowMore] = useState(false);
   const lessons = catalog.lessons;
   const badges = buildBadges(selectedChild, lessons.length);
   const earned = badges.filter((b) => b.earned).length;
   const needs = selectedChild?.needs_practice || [];
   const weekly = selectedChild?.weekly_progress || [];
+  const shownBadges = showAllBadges ? badges : badges.slice(0, 3);
+  const pill = "rounded-full bg-white/90 px-4 py-1.5 font-baloo text-sm font-bold text-[#1978DC] shadow-sm hover:bg-white";
 
   return (
-    <div className="flex flex-col gap-8 max-w-[1096px]">
-      <h2 className="font-heading text-2xl sm:text-[32px] font-extrabold text-vp-ink">Cúp Và Huy Chương Của Bé</h2>
+    <div className="flex w-full max-w-[1096px] flex-col gap-8 font-baloo">
+      <h2 className="font-baloo text-2xl font-extrabold leading-normal text-[#0D3577] sm:text-[32px]">Cúp Và Huy Chương Của Bé</h2>
 
       <div className="grid gap-4 sm:grid-cols-2">
-        <Card className="p-5 flex flex-col gap-3">
-          <p className="text-sm text-vp-muted">Tổng Điểm Đã Tích Lũy</p>
-          <p data-testid="kid-xp" className="font-heading text-4xl font-extrabold text-vp-blue">{selectedChild?.stars ?? 0} XP</p>
-        </Card>
-        <Card className="p-5 flex flex-col gap-3">
-          <p className="text-sm text-vp-muted">Chuỗi Ngày Liên Tiếp</p>
-          <p className="font-heading text-4xl font-extrabold text-amber-500">{selectedChild?.streak ?? 0} Ngày</p>
-        </Card>
+        <div className={`${CARD} flex flex-col gap-3 p-5 leading-normal`}>
+          <p className="text-sm text-[#6B7280]">Tổng Điểm Đã Tích Lũy</p>
+          <p data-testid="kid-xp" className="text-4xl font-extrabold text-[#1978DC]">{selectedChild?.stars ?? 0} XP</p>
+        </div>
+        <div className={`${CARD} flex flex-col gap-3 p-5 leading-normal`}>
+          <p className="text-sm text-[#6B7280]">Chuỗi Ngày Liên Tiếp</p>
+          <p className="text-4xl font-extrabold text-[#F59E0B]">{selectedChild?.streak ?? 0} Ngày</p>
+        </div>
       </div>
 
       <section className="flex flex-col gap-4">
-        <div className="flex items-center justify-between">
-          <h3 className="font-heading text-[22px] font-bold text-vp-ink">Huy hiệu bé tự hào rinh được</h3>
-          <span className="text-sm font-bold text-vp-blue">{earned}/{badges.length}</span>
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="font-baloo text-[22px] font-bold leading-normal text-[#0D3577]">Huy hiệu bé tự hào rinh được</h3>
+          <span className="rounded-full bg-white/90 px-3 text-sm font-bold text-[#1978DC]">{earned}/{badges.length}</span>
         </div>
-        <div className="grid gap-4 grid-cols-2 lg:grid-cols-3">
-          {badges.map(({ id, title, desc, icon: Icon, earned: on }) => (
-            <Card key={id} className={`p-5 flex flex-col items-center gap-3 text-center ${on ? "" : "opacity-55"}`}>
-              <div className={`w-16 h-16 rounded-full grid place-items-center ${on ? "bg-vp-sky" : "bg-vp-border"}`}>
-                {on ? <Icon className="w-8 h-8 text-vp-blue" strokeWidth={1.5} /> : <Lock className="w-7 h-7 text-slate-400" />}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+          {shownBadges.map(({ id, title, desc, icon: Icon, earned: on }) => (
+            <div key={id} data-testid={`badge-${id}`} className={`${CARD} flex flex-col items-center gap-3 p-5 text-center leading-normal ${on ? "" : "bg-[#E4E4E7]"}`}>
+              <div className={`grid h-16 w-16 place-items-center rounded-full ${on ? "bg-[#DDF5FF]" : "bg-white"}`}>
+                {on ? <Icon className="h-8 w-8 text-[#1978DC]" strokeWidth={1.5} /> : <Lock className="h-7 w-7 text-[#6B7280]" />}
               </div>
-              <p className="font-bold text-vp-ink">{title}</p>
-              <p className="text-xs text-vp-muted">{desc}</p>
-            </Card>
-          ))}
-        </div>
-      </section>
-
-      <div className="grid gap-4 lg:grid-cols-2">
-        <Card className="p-6 flex flex-col gap-4">
-          <h3 className="font-heading text-xl font-bold text-vp-ink">Độ chính xác các tuần gần đây</h3>
-          <div className="flex items-end gap-3 h-36">
-            {weekly.map((v, i) => (
-              <div key={i} className="flex-1 h-full justify-end flex flex-col items-center gap-1">
-                <span className="text-xs font-bold text-vp-blue">{v}%</span>
-                <div className="w-full rounded-t-lg bg-vp-blue/80" style={{ height: `${v}%` }} />
-                <span className="text-[11px] text-vp-muted">T{i + 1}</span>
-              </div>
-            ))}
-          </div>
-        </Card>
-        <Card className="p-6 flex flex-col gap-4">
-          <h3 className="font-heading text-xl font-bold text-vp-ink">Âm bé cần luyện thêm</h3>
-          {needs.map((sound, i) => (
-            <div key={sound} className="flex items-center gap-3">
-              <div className="flex-1">
-                <p className="text-sm font-semibold text-vp-ink">{sound}</p>
-                <ProgressBar value={Math.max(10, Math.min(100, Math.round(selectedChild?.overall_accuracy ?? 50) - 10 * i))} barClass="bg-amber-400" className="mt-1" />
-              </div>
-              <button
-                onClick={() => lessons.length > 0 && onGoToLesson(lessonFor(sound, lessons, i).id)}
-                className="flex items-center gap-1 rounded-full bg-vp-blue px-3 h-8 text-xs font-bold text-white"
-              >
-                <Play className="w-3 h-3" /> Luyện
-              </button>
+              <p className="text-base font-bold text-[#0D3577]">{title}</p>
+              <p className={`text-xs ${on ? "text-[#6B7280]" : "text-[#4B5563]"}`}>{desc}{on ? "" : " (chưa mở)"}</p>
             </div>
           ))}
-          {needs.length === 0 && <p className="text-sm text-vp-muted">Bé đang làm rất tốt, chưa có âm nào cần luyện thêm!</p>}
-        </Card>
-      </div>
+        </div>
+        {badges.length > 3 && (
+          <div>
+            <button type="button" data-testid="badges-toggle" onClick={() => setShowAllBadges((v) => !v)} className={pill}>
+              {showAllBadges ? "Thu gọn" : `Xem tất cả (${badges.length})`}
+            </button>
+          </div>
+        )}
+      </section>
+
+      <section className="flex flex-col gap-3">
+        <div>
+          <button type="button" data-testid="more-stats-toggle" onClick={() => setShowMore((v) => !v)} className={pill}>
+            {showMore ? "Ẩn thống kê chi tiết" : "Xem thống kê chi tiết"}
+          </button>
+        </div>
+        {showMore && (
+          <div className="grid gap-4 lg:grid-cols-2">
+            <div className={`${CARD} flex flex-col gap-4 p-6`}>
+              <h3 className="font-baloo text-xl font-bold text-[#0D3577]">Độ chính xác các tuần gần đây</h3>
+              <div className="flex h-36 items-end gap-3">
+                {weekly.map((v, i) => (
+                  <div key={i} className="flex h-full flex-1 flex-col items-center justify-end gap-1">
+                    <span className="text-xs font-bold text-[#1978DC]">{v}%</span>
+                    <div className="w-full rounded-t-lg bg-[#1978DC]/80" style={{ height: `${v}%` }} />
+                    <span className="text-[11px] text-[#6B7280]">T{i + 1}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className={`${CARD} flex flex-col gap-4 p-6`}>
+              <h3 className="font-baloo text-xl font-bold text-[#0D3577]">Âm bé cần luyện thêm</h3>
+              {needs.map((sound, i) => (
+                <div key={sound} className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <p className="text-sm font-semibold text-[#0D3577]">{sound}</p>
+                    <ProgressBar value={Math.max(10, Math.min(100, Math.round(selectedChild?.overall_accuracy ?? 50) - 10 * i))} barClass="bg-amber-400" className="mt-1" />
+                  </div>
+                  <button
+                    onClick={() => lessons.length > 0 && onGoToLesson(lessonFor(sound, lessons, i).id)}
+                    className="flex h-8 items-center gap-1 rounded-full bg-[#1978DC] px-3 text-xs font-bold text-white"
+                  >
+                    <Play className="h-3 w-3" /> Luyện
+                  </button>
+                </div>
+              ))}
+              {needs.length === 0 && <p className="text-sm text-[#6B7280]">Bé đang làm rất tốt, chưa có âm nào cần luyện thêm!</p>}
+            </div>
+          </div>
+        )}
+      </section>
     </div>
   );
 }

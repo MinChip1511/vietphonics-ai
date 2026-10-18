@@ -51,7 +51,7 @@ export default function RewardsView({ selectedChild, onProfileChange }) {
   return (
     <div className="w-full">
       <ConfettiCelebration active={celebrate} />
-      <div className="content-stretch mx-auto flex w-full max-w-7xl flex-col items-start gap-6 p-4 font-baloo sm:p-6 lg:p-8">
+      <div className="content-stretch mx-auto flex w-full max-w-7xl flex-col items-start gap-6 font-baloo">
         <header className="flex w-full flex-col items-start justify-between gap-2 leading-normal sm:flex-row sm:items-center">
           <h1 className="font-baloo text-[28px] font-extrabold leading-normal text-[#0D3577]">Đổi Quà Đáng Yêu</h1>
           <p data-testid="wallet" className="font-baloo text-[15px] font-bold leading-normal text-[#1978DC] sm:text-right">
@@ -60,10 +60,10 @@ export default function RewardsView({ selectedChild, onProfileChange }) {
         </header>
         {error && <p role="alert" className="w-full rounded-xl bg-red-50 px-4 py-2 text-sm font-semibold text-red-500">{error}</p>}
 
-        <section aria-label="Danh sách phần thưởng" className="flex w-full flex-col items-stretch gap-4 md:flex-row md:flex-wrap">
+        <section aria-label="Danh sách phần thưởng" className="flex w-full flex-col items-stretch gap-4 md:flex-row">
           {data && data.rewards.length === 0 && <p className="text-vp-muted">Chưa có phần thưởng nào. Ba mẹ quay lại sau nhé!</p>}
           {data?.rewards.map((reward) => (
-            <div key={reward.id} className="flex md:w-[calc(33.333%-0.75rem)]">
+            <div key={reward.id} className="flex w-full md:min-w-0 md:flex-1">
               <RewardCard reward={reward} owned={data.owned.includes(reward.id)} balance={data.balance} onRedeem={redeem} />
             </div>
           ))}

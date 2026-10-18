@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Volume2, ArrowRight, ChevronRight, Mic, Square, Loader, ChevronLeft } from "lucide-react";
+import { Volume2, ArrowRight, ChevronRight, Mic, Square, Loader, LoaderPinwheel, Turtle, ChevronLeft } from "lucide-react";
 import MascotBubble from "../../components/MascotBubble";
 import { speakVietnamese, playSoundEffect } from "../../services/audioService";
 import { submitAudioAnalysis } from "../../services/apiService";
@@ -10,11 +10,11 @@ import { MicPermissionScreen, RecordingErrorsScreen } from "./MicScreens";
 // 06 recording-ready (7:293), 07 recording-active (7:332), 08 ai-processing (7:375).
 function Waveform() {
   return (
-    <div className="flex items-center gap-2 h-16" aria-hidden="true">
-      {[20, 40, 64, 50, 30, 12].map((h, i) => (
+    <div className="flex items-center gap-2 h-10" aria-hidden="true">
+      {[14, 26, 40, 34, 20, 8].map((h, i) => (
         <span
           key={i}
-          className="w-1.5 rounded-full bg-vp-blue animate-[wave-bar_0.9s_ease-in-out_infinite]"
+          className="w-1 rounded-full bg-vp-blue animate-[wave-bar_0.9s_ease-in-out_infinite]"
           style={{ height: `${h}px`, animationDelay: `${i * 0.12}s` }}
         />
       ))}
@@ -91,9 +91,16 @@ export default function WordPractice({ lesson, aiEnabled = true, childId, onFini
     speakVietnamese(text, rate);
   };
 
-  const guide = lesson.mouthGuide || {};
-  const introLetter = (lesson.targetPhonemes?.[0] || word.phoneme || "a").replace(/[^A-Za-zÀ-ỹ]/g, "").toLowerCase() || "a";
-  const introTitle = guide.title || word.phonemeName;
+  const guide = lesson.mouthGuide || lesson.mouth_guide || {};
+  const targets = lesson.targetPhonemes || lesson.target_phonemes || [];
+  const letterOf = (p) => (p || "").replace(/[^A-Za-zÀ-ỹ]/g, "").toLowerCase();
+  const introLetter = letterOf(targets.find((p) => letterOf(p).length === 1)) || letterOf(word.phoneme).slice(0, 1) || "a";
+  const hasSound = ["initial_consonants", "final_consonants", "vowels"].includes(lesson.category);
+  // Figma: bold title above the caption, e.g. Nguyên âm "a". Lessons without a single sound (tones, sentences) use their own name.
+  const introTitle = hasSound
+    ? `${lesson.category === "vowels" ? "Nguyên âm" : "Âm"} "${introLetter}"`
+    : lesson.title.replace(/^Bài \d+: /, "");
+  const introCaption = word.guide || guide.tip;
   const introMessage = `Chào mừng bé đến với ${lesson.title.replace(/^Bài \d+: /, "bài ")}! Bé hãy nghe cách đọc và một số từ mẫu trước nha.`;
 
   const mascotMessage = {
@@ -127,20 +134,20 @@ export default function WordPractice({ lesson, aiEnabled = true, childId, onFini
   );
 
   return (
-    <div className="flex flex-col items-center gap-6" data-testid={`practice-phase-${phase}`}>
+    <div className="flex flex-col items-center gap-8" data-testid={`practice-phase-${phase}`}>
       <div className="w-full">
         <MascotBubble message={mascotMessage} listenLabel="Nghe Cá Xanh đọc mẫu trước nha" />
       </div>
 
       {phase === "intro" && (
         <>
-          <div className="w-full max-w-[480px] rounded-[28px] border-2 border-vp-sky bg-white p-8 sm:p-10 flex flex-col items-center gap-6 shadow-vp-lift">
+          <div className="w-full max-w-[480px] rounded-[28px] border-2 border-vp-sky bg-white p-8 sm:p-10 flex flex-col items-center gap-7 shadow-vp-lift">
             <div className="w-40 h-40 rounded-full bg-vp-sky grid place-items-center">
               <span className="font-heading text-8xl font-extrabold text-vp-blue leading-none">{introLetter}</span>
             </div>
-            <div className="flex flex-col items-center gap-2 text-center">
+            <div className="flex flex-col items-center gap-3 text-center">
               <p className="font-heading text-[28px] font-extrabold text-vp-ink leading-tight">{introTitle}</p>
-              <p className="text-base text-vp-muted">{guide.tip || word.guide}</p>
+              <p className="text-base text-vp-muted">{introCaption}</p>
             </div>
             <button
               onClick={() => listen((lesson.warmup || [word.word]).join(", "))}
@@ -152,7 +159,7 @@ export default function WordPractice({ lesson, aiEnabled = true, childId, onFini
           <button
             id="btn-start-practice"
             onClick={() => { playSoundEffect("click"); setPhase("listen"); }}
-            className="w-full max-w-[400px] flex items-center justify-center gap-2 rounded-3xl bg-vp-blue px-12 py-[18px] font-heading text-xl font-extrabold text-white shadow-vp-cta hover:brightness-110"
+            className="w-full max-w-[400px] flex items-center justify-center gap-2 rounded-3xl bg-vp-blue px-12 py-5 font-heading text-xl font-extrabold text-white shadow-vp-cta hover:brightness-110"
           >
             Bắt đầu luyện tập <ArrowRight className="w-5 h-5" />
           </button>
@@ -162,31 +169,34 @@ export default function WordPractice({ lesson, aiEnabled = true, childId, onFini
       {phase === "listen" && (
         <>
           <div className="w-full max-w-[500px] relative rounded-[32px] border-2 border-vp-sky bg-white p-8 flex flex-col items-center gap-6 shadow-vp-lift">
-            {pager}
-            <div className="w-full h-[160px] rounded-2xl bg-vp-sky grid place-items-center">
+            <div className="relative w-full h-[200px] rounded-2xl bg-vp-sky grid place-items-center">
               <span className="text-8xl" aria-hidden="true">{word.illustration}</span>
+              {pager}
             </div>
-            <p className="text-xs font-bold uppercase text-vp-blue mt-2">Từ khóa bài học</p>
-            <p className="font-heading text-[40px] font-extrabold text-vp-ink leading-tight text-center">{word.word}</p>
-            <div className="flex flex-wrap items-center justify-center gap-3">
+            <p className="text-xs font-bold uppercase text-vp-blue mt-1">Từ khóa bài học</p>
+            <p className="font-heading text-[40px] font-extrabold text-vp-ink leading-none text-center">{word.word}</p>
+            <div className="relative mt-2">
               <button
                 onClick={() => listen(word.word)}
-                className="flex items-center gap-3 rounded-[20px] bg-vp-blue px-6 py-4 text-[18px] font-bold text-white shadow-vp-cta hover:brightness-110"
+                className="flex w-[240px] h-[61px] items-center justify-center gap-3 rounded-[20px] bg-vp-blue text-[18px] font-bold text-white shadow-vp-cta hover:brightness-110"
               >
                 <Volume2 className="w-6 h-6" /> Nhấn để Nghe Lại
               </button>
               <button
+                data-testid="slow-toggle"
                 onClick={() => setRate(rate === 0.85 ? 0.6 : 0.85)}
-                className="rounded-[20px] bg-vp-sky px-4 py-3 text-sm font-bold text-vp-blue"
+                aria-pressed={rate !== 0.85}
+                aria-label={rate === 0.85 ? "Đọc chậm" : "Đọc tốc độ thường"}
+                title={rate === 0.85 ? "Đọc chậm" : "Đang đọc chậm"}
+                className={`absolute left-full top-1/2 -translate-y-1/2 ml-3 grid h-11 w-11 place-items-center rounded-full transition-colors ${rate === 0.85 ? "bg-vp-sky text-vp-blue" : "bg-vp-blue text-white"}`}
               >
-                Tốc độ {rate === 0.85 ? "1x" : "0.75x"}
+                <Turtle className="w-5 h-5" />
               </button>
             </div>
-            <p className="text-sm text-vp-muted text-center">{word.mouthTip}</p>
           </div>
           <button
             onClick={() => { playSoundEffect("click"); setPhase("ready"); }}
-            className="w-full max-w-[400px] flex items-center justify-center gap-2 rounded-3xl bg-emerald-500 px-12 py-[18px] font-heading text-xl font-extrabold text-white shadow-vp-cta hover:bg-emerald-600"
+            className="w-full max-w-[400px] flex items-center justify-center gap-2 rounded-3xl bg-[#10B981] px-12 py-5 font-heading text-xl font-extrabold text-white shadow-vp-cta hover:bg-[#059669]"
           >
             Con đã sẵn sàng đọc <ChevronRight className="w-5 h-5" />
           </button>
@@ -195,7 +205,7 @@ export default function WordPractice({ lesson, aiEnabled = true, childId, onFini
 
       {phase === "ready" && (
         <>
-          <div className="w-full max-w-[500px] relative rounded-[24px] border-[1.5px] border-vp-sky bg-white px-8 py-10 shadow-vp-lift flex flex-col items-center gap-3">
+          <div className="w-full max-w-[500px] relative rounded-[24px] border-[1.5px] border-vp-sky bg-white px-8 py-10 min-h-[178px] shadow-vp-lift flex flex-col items-center justify-center gap-3">
             {pager}
             <p className="text-base font-semibold text-vp-muted">BÉ HÃY ĐỌC TO:</p>
             <p className="font-heading text-5xl font-extrabold text-vp-ink text-center">{word.word}</p>
@@ -232,16 +242,16 @@ export default function WordPractice({ lesson, aiEnabled = true, childId, onFini
 
       {phase === "recording" && (
         <>
-          <div className="w-full max-w-[500px] rounded-3xl border-2 border-vp-blue bg-white p-8 shadow-vp-lift grid place-items-center">
+          <div className="w-full max-w-[500px] rounded-3xl border-2 border-vp-blue bg-white p-8 min-h-[152px] shadow-vp-lift grid place-items-center">
             <p className="font-heading text-[56px] leading-tight font-extrabold text-vp-blue text-center">{word.word}</p>
           </div>
           <div className="relative grid place-items-center">
-            <span className="absolute w-44 h-44 rounded-full bg-vp-sky animate-pulse-ring" />
+            <span className="absolute w-[140px] h-[140px] rounded-full bg-vp-sky animate-pulse-ring" />
             <button
               id="btn-stop-recording"
               onClick={recorder.stop}
               aria-label="Dừng thu âm"
-              className="relative w-[140px] h-[140px] rounded-full bg-vp-blue border-[12px] border-vp-sky shadow-vp-cta grid place-items-center text-white"
+              className="relative w-[140px] h-[140px] rounded-full bg-vp-blue border-[6px] border-vp-sky shadow-vp-cta grid place-items-center text-white"
             >
               <span className="w-14 h-14 rounded-full border-2 border-white grid place-items-center">
                 <Square className="w-5 h-5" />
@@ -249,20 +259,19 @@ export default function WordPractice({ lesson, aiEnabled = true, childId, onFini
             </button>
           </div>
           <Waveform />
-          <p className="text-sm font-semibold text-vp-muted">{recorder.seconds}s / {recorder.maxSeconds}s</p>
           <button
             onClick={recorder.stop}
-            className="rounded-3xl bg-vp-sky px-12 py-4 text-lg font-extrabold text-vp-blue"
+            className="rounded-3xl bg-vp-sky/80 px-12 py-4 text-base font-extrabold text-vp-blue whitespace-nowrap"
           >
-            Nhấn để hoàn thành ghi âm
+            Nhấn để hoàn thành ghi âm <span className="ml-1 font-semibold opacity-60">· {recorder.seconds}/{recorder.maxSeconds}s</span>
           </button>
         </>
       )}
 
       {phase === "processing" && (
-        <div data-testid="ai-processing" className="w-full max-w-[480px] rounded-[28px] border border-[#E4E4E7] bg-white p-12 shadow-vp-lift flex flex-col items-center gap-5">
-          <div className="w-[120px] h-[120px] rounded-full bg-[#EFF6FF] grid place-items-center">
-            <Loader className="w-14 h-14 text-vp-blue animate-spin" />
+        <div data-testid="ai-processing" className="w-full max-w-[480px] rounded-[28px] border border-[#E4E4E7] bg-white px-12 py-12 shadow-vp-lift flex flex-col items-center gap-3">
+          <div className="w-[120px] h-[120px] mb-6 rounded-full bg-[#EFF6FF] grid place-items-center">
+            <LoaderPinwheel className="w-12 h-12 text-[#3B82F6] animate-[spin_2.4s_linear_infinite]" strokeWidth={1.5} />
           </div>
           <p className="font-heading text-[22px] font-extrabold text-vp-ink">Đang phân tích âm thanh...</p>
           <p className="text-[15px] text-vp-muted">Học vần bằng trí tuệ nhân tạo mượt mà</p>

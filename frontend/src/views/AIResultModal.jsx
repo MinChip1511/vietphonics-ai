@@ -25,23 +25,23 @@ const BANDS = {
   },
   nearly: {
     label: "SẮP HOÀN THÀNH",
-    card: "bg-amber-100 border-amber-500 border-2",
-    accent: "text-amber-500",
+    card: "bg-amber-100 border-[#F59E0B] border-2",
+    accent: "text-[#F59E0B]",
     mascot: (focus) => `Ối, suýt chút nữa là chuẩn luôn rồi bé ơi! Bé thử điều chỉnh lại âm '${focus}' một xíu nhé!`,
     hint: (tip) => `Gợi ý: ${tip}`,
     cta: "Con muốn đọc lại"
   },
   needs: {
     label: "CẦN LUYỆN TẬP THÊM",
-    card: "bg-[#FEF2F2] border-red-500 border-2",
-    accent: "text-red-500",
+    card: "bg-[#FEF2F2] border-[#EF4444] border-2",
+    accent: "text-[#EF4444]",
     mascot: (focus) => `Đừng buồn nhé bé yêu! Chúng ta cùng làm quen lại khẩu hình chữ '${focus}' để thử lại rinh cúp nhé.`,
     hint: (tip) => `Gợi ý: ${tip}`,
     cta: "Thử lại nhé!"
   }
 };
 
-const HIGHLIGHT_COLOR = { red: "text-red-500", amber: "text-amber-500", yellow: "text-amber-500" };
+const HIGHLIGHT_COLOR = { red: "text-[#EF4444]", amber: "text-[#F59E0B]", yellow: "text-[#F59E0B]" };
 
 function HighlightedWord({ word, highlights, band }) {
   const segments = highlights?.length ? highlights : [{ text: word, color: "green" }];
@@ -112,14 +112,11 @@ export default function AIResultModal({ isOpen, word, result, recording, awarded
           <span className="text-[13px] font-bold">{cfg.label}</span>
           <span data-testid="result-score" className="font-heading text-[32px] font-extrabold">{score}%</span>
         </div>
-        <div className={`flex flex-col items-center gap-2 ${band === "good" ? "py-4" : ""}`}>
+        <div className={`flex flex-col items-center ${band === "good" ? "gap-2 py-4" : "gap-4 pt-[18px] pb-[3px]"}`}>
           <HighlightedWord word={word.word} highlights={result.letter_highlights} band={band} />
           <p className={`text-base font-bold text-center ${cfg.accent}`}>{cfg.hint(tip)}</p>
           {awarded > 0 && (
             <p data-testid="stars-awarded" className="text-sm font-bold text-emerald-600 text-center">Con nhận thêm +{awarded} điểm!</p>
-          )}
-          {awarded === 0 && (
-            <p data-testid="stars-none" className="text-sm text-vp-muted text-center">Đạt từ 70 điểm là con nhận thêm điểm thưởng, mình thử lại nhé!</p>
           )}
           {result?.noise_warning && (
             <p data-testid="noise-warning" className="text-sm font-semibold text-amber-600 text-center">
@@ -133,15 +130,25 @@ export default function AIResultModal({ isOpen, word, result, recording, awarded
           )}
         </div>
         <div className="grid w-full gap-3 sm:grid-cols-2">
-          <button
-            data-testid="replay-recording"
-            onClick={playRecording}
-            disabled={!hasRecording}
-            title={hasRecording ? undefined : "Không có bản ghi của bé để nghe lại"}
-            className={`flex items-center justify-center gap-2 rounded-[20px] px-5 py-3 text-sm font-bold text-vp-blue disabled:opacity-50 disabled:cursor-not-allowed ${band === "good" ? "bg-vp-sky" : "bg-white border border-vp-border"}`}
-          >
-            <Volume2 className="w-4 h-4" /> Nghe lại con đọc
-          </button>
+          {band === "needs" ? (
+            <button
+              data-testid="play-model"
+              onClick={() => playModel(0.85)}
+              className="flex items-center justify-center rounded-[20px] border border-vp-border bg-white px-5 py-3 text-sm font-bold text-zinc-600"
+            >
+              Xem clip mẫu
+            </button>
+          ) : (
+            <button
+              data-testid="replay-recording"
+              onClick={playRecording}
+              disabled={!hasRecording}
+              title={hasRecording ? undefined : "Không có bản ghi của bé để nghe lại"}
+              className={`flex items-center justify-center gap-2 rounded-[20px] px-5 py-3 text-sm font-bold text-vp-blue disabled:opacity-50 disabled:cursor-not-allowed ${band === "good" ? "bg-vp-sky" : "bg-white border border-vp-border"}`}
+            >
+              <Volume2 className="w-4 h-4" /> Nghe lại con đọc
+            </button>
+          )}
           <button
             onClick={() => playModel(band === "good" ? 0.85 : 0.6)}
             className={`rounded-[20px] px-5 py-3 text-sm font-bold text-white ${band === "good" ? "bg-emerald-500" : "bg-vp-blue"}`}
@@ -154,24 +161,38 @@ export default function AIResultModal({ isOpen, word, result, recording, awarded
       <button
         data-testid="result-primary"
         onClick={() => { playSoundEffect("click"); primary(); }}
-        className={`w-full max-w-[400px] flex items-center justify-center gap-2 rounded-[28px] bg-vp-blue px-12 py-5 font-heading text-xl font-extrabold text-white shadow-vp-cta hover:brightness-110 ${band === "good" ? "" : "mt-auto"}`}
+        className={`w-full max-w-[400px] flex items-center justify-center gap-2 rounded-[28px] bg-vp-blue px-12 py-5 font-heading text-xl font-extrabold text-white shadow-vp-cta hover:brightness-110 ${band === "good" ? "" : "order-3 mt-auto"}`}
       >
         {cfg.cta} {band === "good" ? <ChevronRight className="w-5 h-5" /> : band === "nearly" ? <ArrowRight className="w-5 h-5" /> : null}
       </button>
       {band !== "good" && (
-        <button onClick={() => { playSoundEffect("click"); onNext(); }} className="text-xs font-semibold text-vp-muted hover:text-vp-blue">
-          Bỏ qua, sang từ tiếp theo
-        </button>
+        <div className="order-1 flex flex-wrap items-center justify-center gap-x-5 gap-y-1 rounded-full bg-white/80 px-5 py-1.5">
+          {band === "needs" && hasRecording && (
+            <button data-testid="replay-recording" onClick={playRecording} className="flex items-center gap-1.5 text-xs font-semibold text-vp-muted hover:text-vp-blue">
+              <Volume2 className="w-3.5 h-3.5" /> Nghe lại con đọc
+            </button>
+          )}
+          <button onClick={() => { playSoundEffect("click"); onNext(); }} className="text-xs font-semibold text-vp-muted hover:text-vp-blue">
+            Bỏ qua, sang từ tiếp theo
+          </button>
+          {rows.length > 0 && (
+            <button onClick={() => setShowDetails(!showDetails)} className="flex items-center gap-1 text-xs font-semibold text-vp-muted hover:text-vp-blue">
+              Chi tiết từng âm <ChevronDown className={`w-4 h-4 transition-transform ${showDetails ? "rotate-180" : ""}`} />
+            </button>
+          )}
+        </div>
       )}
 
       {rows.length > 0 && (
-        <div className="w-full max-w-[700px] text-xs">
-          <button
-            onClick={() => setShowDetails(!showDetails)}
-            className="mx-auto flex items-center gap-1 text-xs font-semibold text-vp-muted hover:text-vp-blue"
-          >
-            Chi tiết từng âm <ChevronDown className={`w-4 h-4 transition-transform ${showDetails ? "rotate-180" : ""}`} />
-          </button>
+        <div className={`w-full max-w-[700px] text-xs ${band === "good" ? "" : "order-2"}`}>
+          {band === "good" && (
+            <button
+              onClick={() => setShowDetails(!showDetails)}
+              className="mx-auto flex items-center gap-1 text-xs font-semibold text-vp-muted hover:text-vp-blue"
+            >
+              Chi tiết từng âm <ChevronDown className={`w-4 h-4 transition-transform ${showDetails ? "rotate-180" : ""}`} />
+            </button>
+          )}
           {showDetails && (
             <div className="mt-3 grid gap-2">
               {rows.map((row, i) => {
