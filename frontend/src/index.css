@@ -19,6 +19,21 @@
 }
 
 @layer base {
+  /* Tailwind v4 leaves buttons with the arrow cursor: show a hand on anything clickable. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  summary,
+  select:not(:disabled),
+  input[type="checkbox"]:not(:disabled),
+  input[type="radio"]:not(:disabled),
+  input[type="range"]:not(:disabled) {
+    cursor: pointer;
+  }
+  button:disabled,
+  [role="button"][aria-disabled="true"] {
+    cursor: not-allowed;
+  }
+
   body {
     font-family: 'Nunito', 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
     color: #1e293b;
