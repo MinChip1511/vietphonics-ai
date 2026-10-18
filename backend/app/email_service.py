@@ -5,6 +5,7 @@
 import json
 import logging
 import smtplib
+import socket
 import ssl
 import urllib.error
 import urllib.request
@@ -52,6 +53,34 @@ def send_email(to: str, subject: str, text: str, html: str = None) -> None:
         raise EmailUnavailable(f"unknown EMAIL_PROVIDER {provider!r}")
 
 
+def _connect_ipv4(host, port, timeout):
+    """Open the TCP connection over IPv4 only: some hosts (Render) have no IPv6 route, and the default
+    resolution can pick an IPv6 address first and fail with "Network is unreachable"."""
+    last = None
+    for family, kind, proto, _, address in socket.getaddrinfo(host, port, socket.AF_INET, socket.SOCK_STREAM):
+        sock = socket.socket(family, kind, proto)
+        sock.settimeout(timeout)
+        try:
+            sock.connect(address)
+            return sock
+        except OSError as exc:
+            sock.close()
+            last = OSError(f"{exc} (to {address[0]}:{port})")
+    raise last or OSError(f"no IPv4 address for {host}")
+
+
+def _ipv4_client(base):
+    """`base` (smtplib.SMTP or SMTP_SSL, looked up when a mail is sent) with the IPv4-only connection."""
+    class Client(base):
+        def _get_socket(self, host, port, timeout):
+            sock = _connect_ipv4(host, port, timeout)
+            if base is smtplib.SMTP_SSL:
+                return self.context.wrap_socket(sock, server_hostname=self._host)
+            return sock
+
+    return Client
+
+
 def _send_smtp(to, subject, text, html):
     message = EmailMessage()
     message["Subject"] = subject
@@ -63,11 +92,11 @@ def _send_smtp(to, subject, text, html):
     context = ssl.create_default_context()
     try:
         if config.SMTP_PORT == 465:
-            with smtplib.SMTP_SSL(config.SMTP_HOST, config.SMTP_PORT, timeout=15, context=context) as server:
+            with _ipv4_client(smtplib.SMTP_SSL)(config.SMTP_HOST, config.SMTP_PORT, timeout=15, context=context) as server:
                 server.login(config.SMTP_USER, config.SMTP_PASSWORD)
                 server.send_message(message)
         else:
-            with smtplib.SMTP(config.SMTP_HOST, config.SMTP_PORT, timeout=15) as server:
+            with _ipv4_client(smtplib.SMTP)(config.SMTP_HOST, config.SMTP_PORT, timeout=15) as server:
                 server.starttls(context=context)
                 server.login(config.SMTP_USER, config.SMTP_PASSWORD)
                 server.send_message(message)
