@@ -46,6 +46,7 @@ export default function ForgotPasswordView({ nav, onLoggedIn }) {
   const [email, setEmail] = useState("");
   const [sent, setSent] = useState(false);
   const [expires, setExpires] = useState(0);
+  const [cooldown, setCooldown] = useState(0);
   const [code, setCode] = useState("");
   const [pw, setPw] = useState("");
   const [pw2, setPw2] = useState("");
@@ -57,6 +58,12 @@ export default function ForgotPasswordView({ nav, onLoggedIn }) {
     return () => clearTimeout(t);
   }, [expires]);
 
+  useEffect(() => {
+    if (cooldown <= 0) return undefined;
+    const t = setTimeout(() => setCooldown(cooldown - 1), 1000);
+    return () => clearTimeout(t);
+  }, [cooldown]);
+
   const strength = passwordStrength(pw);
   const mm = String(Math.floor(expires / 60)).padStart(2, "0");
   const ss = String(expires % 60).padStart(2, "0");
@@ -67,7 +74,9 @@ export default function ForgotPasswordView({ nav, onLoggedIn }) {
     const res = await auth.sendCode(email.trim(), "reset");
     if (!res.ok) return setError(res.error);
     setSent(true);
+    setCode("");
     setExpires(300);
+    setCooldown(60);
   };
 
   const submit = async (e) => {
@@ -94,8 +103,8 @@ export default function ForgotPasswordView({ nav, onLoggedIn }) {
           label="Email đã đăng ký *"
           icon={Mail}
           right={
-            <button type="button" data-testid="forgot-send" onClick={send} disabled={sent && expires > 240} className="h-[52px] shrink-0 rounded-full bg-[#CCE4ED] px-6 text-xs font-bold text-[#50666E] disabled:opacity-60 flex items-center gap-1.5">
-              <Send className="w-4 h-4" /> {sent ? "Gửi lại" : "Gửi mã xác thực"}
+            <button type="button" data-testid="forgot-send" onClick={send} disabled={cooldown > 0} className="h-[52px] shrink-0 rounded-full bg-[#CCE4ED] px-6 text-xs font-bold text-[#50666E] disabled:opacity-60 flex items-center gap-1.5">
+              <Send className="w-4 h-4" /> {cooldown > 0 ? `Gửi lại sau ${cooldown}s` : sent ? "Gửi lại" : "Gửi mã xác thực"}
             </button>
           }
         >
