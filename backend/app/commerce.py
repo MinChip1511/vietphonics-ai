@@ -4,16 +4,18 @@ Payment is simulated for now (no payment gateway is connected): an order is crea
 demo confirmation marks it paid and upgrades the account.
 """
 import re
-from datetime import date
+from datetime import date, datetime, timedelta
 
 from pymongo import ReturnDocument
 
 from . import config
-from .database import clean, clean_all, col, now_iso
+from .database import clean, clean_all, col, iso, now_iso, utc_now
 
 ORDER_STATUSES = ("paid", "pending", "failed", "expired", "refunded")
 PERIODS = ("monthly", "yearly")
 PERIOD_LABEL = {"monthly": "1 Tháng", "yearly": "1 Năm"}
+PERIOD_DAYS = {"monthly": 30, "yearly": 365}
+PENDING_ORDER_DAYS = 7  # an unpaid order is closed after this long (an admin can still confirm it later)
 COUPON_TYPES = ("percent", "amount")
 _CODE = re.compile(r"^[A-Z0-9_-]{3,30}$")
 
@@ -186,7 +188,7 @@ def create_order(account, plan_id, period, coupon_code=None, method="QR ngân h�
         "phone": account["phone"],
         "plan": f"Gói {plan['name']} {PERIOD_LABEL[period]}" + (f" (mã {coupon['id']})" if coupon else ""),
         "amount": final, "method": method if (method in MANUAL_METHODS or (method == "MoMo" and momo_enabled())) else f"{method} (mô phỏng)",
-        "status": "pending", "created_at": now_iso(),
+        "status": "pending", "period": period, "created_at": now_iso(),
     })
     return get_order(order_id)
 
@@ -200,8 +202,21 @@ def mark_paid(order_id, extra=None):
     if not paid:
         return None
     plan_name = re.match(r"Gói (\w+)", paid["plan"]).group(1).lower()
-    col("accounts").update_one({"_id": paid["account_id"]}, {"$set": {"plan": plan_name}})
+    account = col("accounts").find_one({"_id": paid["account_id"]}) or {}
+    start = utc_now()
+    current_end = account.get("plan_expires_at")
+    if account.get("plan") == plan_name and current_end and current_end > now_iso():
+        start = datetime.strptime(current_end, "%Y-%m-%dT%H:%M:%S.%fZ")  # renewing early adds to the time left
+    ends = iso(start + timedelta(days=PERIOD_DAYS.get(paid.get("period"), 30)))
+    col("accounts").update_one({"_id": paid["account_id"]}, {"$set": {"plan": plan_name, "plan_expires_at": ends}})
     return get_order(order_id)
+
+
+def expire_subscriptions():
+    """Housekeeping: paid plans past their end date fall back to Free, old unpaid orders are closed."""
+    col("accounts").update_many({"plan": {"$ne": "free"}, "plan_expires_at": {"$nin": [None, ""], "$lt": now_iso()}}, {"$set": {"plan": "free"}})
+    cutoff = iso(utc_now() - timedelta(days=PENDING_ORDER_DAYS))
+    col("orders").update_many({"status": "pending", "created_at": {"$lt": cutoff}}, {"$set": {"status": "expired"}})
 
 
 def confirm_demo_payment(order_id, account):

@@ -30,6 +30,12 @@ class AuthError(Exception):
         self.status = status
 
 
+def plan_is_expired(row) -> bool:
+    """A paid plan with an end date in the past. Accounts without an end date (admin-granted, demo) never expire."""
+    expires = row.get("plan_expires_at")
+    return row["plan"] != "free" and bool(expires) and expires < now_iso()
+
+
 def public_account(row, kids=None) -> dict:
     """The account as the client may see it (never the hash). `kids` saves a query when listing many."""
     if kids is None:
@@ -40,7 +46,8 @@ def public_account(row, kids=None) -> dict:
         "name": row["name"],
         "email": row["email"],
         "phone": row["phone"],
-        "plan": row["plan"],
+        "plan": "free" if plan_is_expired(row) else row["plan"],
+        "planExpiresAt": row.get("plan_expires_at"),
         "status": row["status"],
         "mustChangePassword": bool(row["must_change_password"]),
         "isDemo": bool(row["is_demo"]),
@@ -225,7 +232,8 @@ def set_status(account_id, status):
 
 
 def set_plan(account_id, plan):
-    col("accounts").update_one({"_id": account_id}, {"$set": {"plan": plan}})
+    # A plan set by an admin has no end date; paying (commerce.mark_paid) is what sets one.
+    col("accounts").update_one({"_id": account_id}, {"$set": {"plan": plan, "plan_expires_at": None}})
 
 
 def admin_create_parent(*, name, email, phone, plan="free"):

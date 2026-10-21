@@ -21,6 +21,7 @@ from .audio_quality import analyze_signal
 from . import config
 from . import database, email_service
 from .catalog import CatalogError, get_lesson
+from . import commerce
 from .commerce import CommerceError
 from .database import init_db
 from .features import decode_audio_bytes, acoustic_81, nccf_pitch, resize_time
@@ -245,6 +246,7 @@ def _connect_database():
     while True:
         try:
             init_db()
+            commerce.expire_subscriptions()
             log.info("MongoDB ready")
             return
         except Exception:

@@ -164,6 +164,50 @@ def a_manual_transfer_order_is_real_and_the_admin_confirmation_upgrades_the_plan
     assert client.get(f"/api/orders/{order['id']}", headers=h).json()["status"] == "paid"
 
 
+@case
+def paying_sets_an_end_date_that_renewal_extends_and_expiry_returns_the_plan_to_free():
+    from datetime import datetime, timedelta
+
+    from backend.app import commerce
+    from backend.app.database import iso, utc_now
+
+    h = login()
+    me = client.get("/api/auth/me", headers=h).json()["user"]
+    account_id = me["id"]
+    col("accounts").update_one({"_id": account_id}, {"$set": {"plan": "free", "plan_expires_at": None}})
+    order = new_order(h, method="Chuyển khoản MoMo")  # premium, monthly
+    assert commerce.mark_paid(order["id"])["status"] == "paid"
+    row = col("accounts").find_one({"_id": account_id})
+    end = datetime.strptime(row["plan_expires_at"], "%Y-%m-%dT%H:%M:%S.%fZ")
+    assert row["plan"] == "premium" and timedelta(days=29) < end - utc_now() < timedelta(days=31), row
+    assert client.get("/api/auth/me", headers=h).json()["user"]["planExpiresAt"] == row["plan_expires_at"]
+    second = new_order(h, method="Chuyển khoản MoMo")
+    commerce.mark_paid(second["id"])  # renewing early adds to the time left
+    end2 = datetime.strptime(col("accounts").find_one({"_id": account_id})["plan_expires_at"], "%Y-%m-%dT%H:%M:%S.%fZ")
+    assert timedelta(days=59) < end2 - utc_now() < timedelta(days=61)
+    col("accounts").update_one({"_id": account_id}, {"$set": {"plan_expires_at": iso(utc_now() - timedelta(days=1))}})
+    assert client.get("/api/auth/me", headers=h).json()["user"]["plan"] == "free"  # reads as Free the moment it ends
+    commerce.expire_subscriptions()
+    assert col("accounts").find_one({"_id": account_id})["plan"] == "free"
+    col("accounts").update_one({"_id": account_id}, {"$set": {"plan": "premium", "plan_expires_at": None}})  # restore the demo account
+
+
+@case
+def old_unpaid_orders_are_closed_but_an_admin_can_still_confirm_them():
+    from datetime import timedelta
+
+    from backend.app import commerce
+    from backend.app.database import iso, utc_now
+
+    h = login()
+    order = new_order(h, method="Chuyển khoản VNPay")
+    col("orders").update_one({"_id": order["id"]}, {"$set": {"created_at": iso(utc_now() - timedelta(days=8))}})
+    commerce.expire_subscriptions()
+    assert col("orders").find_one({"_id": order["id"]})["status"] == "expired"
+    assert commerce.set_order_status(order["id"], "paid")["status"] == "paid"
+    col("accounts").update_one({"email": "phuhuynh@vietphonics.vn"}, {"$set": {"plan": "premium", "plan_expires_at": None}})
+
+
 if __name__ == "__main__":
     failed = 0
     for fn in CASES:

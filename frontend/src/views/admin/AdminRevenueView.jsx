@@ -88,7 +88,7 @@ export default function AdminRevenueView() {
         <Lock className="w-5 h-5 text-orange-500 shrink-0" />
         <div>
           <p className="font-bold text-vp-ink">Đối soát ngân hàng tự động <span className="ml-1 rounded-md bg-orange-50 px-2 py-0.5 text-[10px] font-bold text-orange-500">PHASE 2</span></p>
-          <p className="text-xs text-vp-muted">Thanh toán hiện được mô phỏng, chưa kết nối cổng thanh toán hay API ngân hàng nên số liệu trên chỉ là đơn thử nghiệm.</p>
+          <p className="text-xs text-vp-muted">Khách thanh toán bằng cách quét mã QR VNPay/MoMo rồi chuyển khoản; một đơn chỉ tính vào doanh thu sau khi bạn xác nhận đã nhận tiền ở mục Đơn hàng.</p>
         </div>
       </Card>
       <Modal open={csv !== null} onClose={() => setCsv(null)} title="File đối soát (.CSV)" width="max-w-3xl"

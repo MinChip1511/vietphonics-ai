@@ -40,7 +40,7 @@ REWARDS = [
 ]
 SETTINGS = {
     "audioRetentionDays": 90,
-    "paymentEnv": "SANDBOX (mô phỏng, chưa kết nối cổng thanh toán)",
+    "paymentEnv": "Chuyển khoản QR VNPay/MoMo (xác nhận thủ công)",
     "roles": [
         {"id": "super", "name": "Super Admin (Quản trị tối cao)", "desc": "Mọi quyền truy cập hệ thống dữ liệu, cài đặt hệ thống.", "count": 1},
     ],

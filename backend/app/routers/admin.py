@@ -129,6 +129,7 @@ def _metrics():
 
 @router.get("/bootstrap")
 def bootstrap():
+    commerce.expire_subscriptions()
     accts, orphans = _accounts_with_children()
     return {
         "accounts": accts,

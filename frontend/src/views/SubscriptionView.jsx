@@ -26,6 +26,10 @@ export default function SubscriptionView({ onRequireLogin }) {
     ? createdDate.toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" })
     : null;
   const current = catalog.find((p) => p.id === planId) || catalog[0];
+  const fmtDate = (iso) => new Date(iso).toLocaleDateString("en-GB", { day: "2-digit", month: "2-digit", year: "numeric" });
+  const endsAt = user?.planExpiresAt ? fmtDate(user.planExpiresAt) : null;
+  const expired = planId === "free" && user?.planExpiresAt && new Date(user.planExpiresAt) < new Date();
+  const daysLeft = user?.planExpiresAt ? Math.ceil((new Date(user.planExpiresAt) - new Date()) / 86400000) : null;
 
   const [invoiceTick, setInvoiceTick] = useState(0);
   useEffect(() => {
@@ -53,6 +57,8 @@ export default function SubscriptionView({ onRequireLogin }) {
             <p className="font-heading text-2xl font-extrabold text-vp-ink">{current.id === "free" ? "Đang dùng thử miễn phí" : `VietPhonics AI ${current.name}`}</p>
             <p className="text-[13px] text-vp-muted">{current.description}</p>
             {activated && <p className="text-[13px] text-vp-muted">Ngày kích hoạt: {activated}</p>}
+            {endsAt && !expired && <p data-testid="plan-ends" className={`text-[13px] ${daysLeft <= 7 ? "font-semibold text-amber-600" : "text-vp-muted"}`}>Hết hạn: {endsAt}{daysLeft <= 7 ? ` (còn ${Math.max(daysLeft, 0)} ngày, hãy gia hạn)` : ""}</p>}
+            {expired && <p data-testid="plan-expired" className="text-[13px] font-semibold text-red-500">Gói trước đã hết hạn ngày {endsAt}. Chọn gói bên dưới để tiếp tục.</p>}
           </div>
           <p className="font-heading text-[32px] font-extrabold text-vp-blue whitespace-nowrap">{current.id === "free" ? "0 VNĐ" : formatVnd(currentPrice)}</p>
         </div>
@@ -86,11 +92,11 @@ export default function SubscriptionView({ onRequireLogin }) {
                   {plan.features.map((f) => <li key={f} className="flex gap-2"><Check className="w-4 h-4 mt-0.5 shrink-0 text-emerald-500" />{f}</li>)}
                 </ul>
                 <button
-                  disabled={isCurrent || plan.id === "free" || !user}
+                  disabled={plan.id === "free" || !user}
                   onClick={() => setCheckoutPlan(plan)}
-                  className={`h-11 rounded-full text-sm font-bold ${isCurrent || plan.id === "free" || !user ? "bg-vp-pill text-vp-muted cursor-not-allowed" : "bg-vp-blue text-white hover:brightness-110"}`}
+                  className={`h-11 rounded-full text-sm font-bold ${plan.id === "free" || !user ? "bg-vp-pill text-vp-muted cursor-not-allowed" : "bg-vp-blue text-white hover:brightness-110"}`}
                 >
-                  {isCurrent ? "Gói hiện tại" : plan.id === "free" ? "Gói miễn phí" : plan.cta}
+                  {plan.id === "free" ? (isCurrent ? "Gói hiện tại" : "Gói miễn phí") : isCurrent ? (endsAt ? "Gia hạn thêm" : "Gói hiện tại") : plan.cta}
                 </button>
               </div>
             );
