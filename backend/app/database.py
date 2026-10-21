@@ -74,6 +74,9 @@ def init_indexes():
     col("reward_redemptions").create_index([("child_id", ASCENDING), ("reward_id", ASCENDING)], unique=True)
     col("analysis_attempts").create_index("created_at")
     col("orders").create_index("account_id")
+    col("orders").create_index([("status", ASCENDING), ("paid_at", DESCENDING)])
+    col("practice_history").create_index("created_at")  # dashboard ranges
+    col("accounts").create_index([("role", ASCENDING), ("created_at", ASCENDING)])
     col("lessons").create_index([("sort_order", ASCENDING)])
 
 

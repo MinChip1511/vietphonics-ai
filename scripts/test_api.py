@@ -538,6 +538,137 @@ def admin_can_test_email_and_sees_the_real_provider_error():
     assert "email" in client.get("/api/health").json()
 
 
+# ---- admin analytics dashboard ----------------------------------------------------------------------
+
+def _dash(token, range_name=None):
+    url = "/api/admin/dashboard" + (f"?range={range_name}" if range_name else "")
+    return client.get(url, headers=auth(token))
+
+
+def _wipe_dashboard_data():
+    from backend.app.database import col
+
+    for name in ("orders", "practice_history", "children"):
+        col(name).delete_many({})
+    col("accounts").delete_many({"role": "parent"})
+
+
+def _seed_order(account, plan, amount, paid_at, status="paid", number=[0]):
+    from backend.app.database import col
+
+    number[0] += 1
+    col("orders").insert_one({
+        "_id": f"DH-T{number[0]}", "account_id": account["id"], "customer": account["name"], "email": account["email"], "phone": "0",
+        "plan": plan, "amount": amount, "method": "QR", "status": status, "period": "monthly",
+        "created_at": paid_at, **({"paid_at": paid_at} if status == "paid" else {}),
+    })
+
+
+@case
+def dashboard_is_admin_only():
+    assert client.get("/api/admin/dashboard").status_code == 401
+    ptok, _ = login(*PARENT)
+    assert _dash(ptok).status_code == 403
+    atok, _ = login(*ADMIN)
+    assert _dash(atok).status_code == 200
+
+
+@case
+def dashboard_on_an_empty_database_is_all_zero_and_never_divides_by_zero():
+    atok, _ = login(*ADMIN)
+    _wipe_dashboard_data()
+    for rng in ("today", "7d", "30d", "quarter"):
+        d = _dash(atok, rng).json()
+        k = d["kpis"]
+        assert d["range"] == rng
+        assert k["activeFamilies"] == {"value": 0, "previous": 0, "delta": None}
+        assert k["attempts"]["value"] == 0 and k["attempts"]["delta"] is None
+        assert k["revenue"]["value"] == 0 and k["revenue"]["average"] == 0
+        assert k["conversion"] == {"paidParents": 0, "parents": 0, "percent": 0}
+        assert d["revenueByPlan"] == [] and d["recentBuyers"] == [] and d["topFamilies"] == []
+        assert [s["count"] for s in d["funnel"]] == [0, 0, 0, 0]
+        assert all(s["ofPrevious"] is None for s in d["funnel"])
+        assert all(day["attempts"] == 0 for day in d["daily"])
+        assert {p["id"] for p in d["buyersByPlan"]} >= {"basic", "premium", "family"}
+        assert all(p["buyers"] == 0 for p in d["buyersByPlan"])
+
+
+@case
+def dashboard_counts_match_the_seeded_data_and_ranges_switch():
+    from datetime import timedelta
+    from backend.app.database import col, iso, utc_now
+
+    atok, _ = login(*ADMIN)
+    _wipe_dashboard_data()
+    now = utc_now()
+    ids = []
+    for n in range(1, 4):
+        tok, user = register(900 + n)
+        ids.append((tok, user))
+    # parent 1 registered 20 days ago, 2 and 3 today
+    col("accounts").update_one({"_id": ids[0][1]["id"]}, {"$set": {"created_at": iso(now - timedelta(days=20))}})
+    children = []
+    for tok, user in ids[:2]:
+        r = client.post("/api/profiles", headers=auth(tok), json={"name": "Be An", "age": 5, "avatar": "mascot:ca-voi"})
+        assert r.status_code in (200, 201), r.text
+        children.append(r.json()["id"])
+    def practise(i, score):
+        aid = attempt_for(ids[i][1]["id"], children[i], score)
+        r = client.post("/api/record-practice", headers=auth(ids[i][0]), json={"child_id": children[i], "attempt_id": aid})
+        assert r.status_code == 200, r.text
+
+    practise(0, 90)
+    practise(0, 80)
+    practise(1, 70)
+    # an old attempt (20 days ago) only shows in 30d / quarter
+    practise(0, 60)
+    col("practice_history").update_one({"child_id": children[0], "score": 60}, {"$set": {"created_at": iso(now - timedelta(days=20))}})
+    acc1 = {**ids[0][1]}
+    acc2 = {**ids[1][1]}
+    _seed_order(acc1, "Gói Basic 1 Tháng", 49000, iso(now))
+    _seed_order(acc1, "Gói Basic 1 Tháng", 49000, iso(now - timedelta(days=1)))
+    _seed_order(acc2, "Gói Premium 1 Tháng", 79000, iso(now - timedelta(days=15)))
+    _seed_order(acc2, "Gói Family 1 Tháng", 129000, iso(now), status="pending")
+    col("accounts").update_one({"_id": acc1["id"]}, {"$set": {"plan": "basic"}})
+    col("accounts").update_one({"_id": acc2["id"]}, {"$set": {"plan": "premium"}})
+
+    d7 = _dash(atok, "7d").json()
+    k = d7["kpis"]
+    assert k["newParents"]["value"] == 2 and k["totalParents"] == 3
+    assert k["attempts"]["value"] == 3 and k["activeFamilies"]["value"] == 2
+    assert k["revenue"]["value"] == 98000 and k["revenue"]["paidOrders"] == 2 and k["revenue"]["average"] == 49000
+    assert k["conversion"] == {"paidParents": 2, "parents": 3, "percent": 66.7}
+    assert len(d7["daily"]) == 7 and sum(x["attempts"] for x in d7["daily"]) == 3
+    assert sum(x["revenue"] for x in d7["daily"]) == 98000 and sum(x["newParents"] for x in d7["daily"]) == 2
+    assert d7["revenueByPlan"] == [{"plan": "Gói Basic 1 Tháng", "orders": 2, "buyers": 1, "amount": 98000}]
+    assert [b["customer"] for b in d7["recentBuyers"]] == [acc1["name"], acc1["name"], acc2["name"]]
+    assert d7["recentBuyers"][0]["email"] == "p***@x.vn"
+    assert d7["topFamilies"][0]["attempts"] == 2 and d7["topFamilies"][0]["children"] == 1
+    plans = {p["id"]: p for p in d7["buyersByPlan"]}
+    assert plans["basic"]["buyers"] == 1 and plans["basic"]["orders"] == 2 and plans["basic"]["rangeOrders"] == 2
+    assert plans["premium"]["buyers"] == 1 and plans["premium"]["rangeBuyers"] == 0 and plans["premium"]["orders"] == 1
+    assert plans["family"]["buyers"] == 0  # pending orders are not purchases
+    assert [s["count"] for s in d7["funnel"]] == [2, 1, 1, 1]
+    assert [s["ofPrevious"] for s in d7["funnel"]] == [100.0, 50.0, 100.0, 100.0]
+
+    d30 = _dash(atok, "30d").json()
+    assert d30["kpis"]["newParents"]["value"] == 3 and d30["kpis"]["attempts"]["value"] == 4
+    assert d30["kpis"]["revenue"]["value"] == 177000 and len(d30["daily"]) == 30
+    assert [s["count"] for s in d30["funnel"]][0] == 3
+    assert d30["kpis"]["activeFamilies"]["previous"] == 0 and d30["kpis"]["activeFamilies"]["delta"] is None
+
+    today = _dash(atok, "today").json()
+    assert len(today["daily"]) == 7 and today["kpis"]["revenue"]["value"] == 49000
+    assert today["kpis"]["attempts"]["value"] == 3
+    # yesterday had one paid order and nothing else: delta is computed from a non-empty previous period
+    assert today["kpis"]["revenue"]["previous"] == 49000 and today["kpis"]["revenue"]["delta"] == 0.0
+    q = _dash(atok, "quarter").json()
+    assert q["kpis"]["newParents"]["value"] >= 2 and q["range"] == "quarter"
+    assert _dash(atok).json()["range"] == "7d"
+    assert _dash(atok, "century").status_code == 422
+    _wipe_dashboard_data()
+
+
 if __name__ == "__main__":
     failed = 0
     for fn in CASES:

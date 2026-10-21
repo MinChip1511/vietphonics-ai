@@ -2,7 +2,7 @@
 from datetime import timedelta
 from typing import Optional
 
-from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
 from pydantic import BaseModel
 
 from .. import accounts, catalog, commerce, config, email_service, kids
@@ -143,6 +143,201 @@ def bootstrap():
         "settings": _settings(),
         "metrics": _metrics(),
         "phones": sorted(catalog.valid_phones()),
+    }
+
+
+# ---- analytics dashboard ----------------------------------------------------------------------------
+
+RANGES = {"today", "7d", "30d", "quarter"}
+RECENT_BUYERS = 8
+TOP_FAMILIES = 5
+
+
+def _day(moment):
+    return moment.strftime("%Y-%m-%d")
+
+
+def _window(range_name, now):
+    """(first_day, last_day) of the range and of the equally long period right before it (UTC days)."""
+    today = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    if range_name == "today":
+        length = 1
+    elif range_name == "30d":
+        length = 30
+    elif range_name == "quarter":
+        quarter_start = today.replace(month=3 * ((today.month - 1) // 3) + 1, day=1)
+        length = (today - quarter_start).days + 1
+    else:
+        length = 7
+    first = today - timedelta(days=length - 1)
+    return first, today, length
+
+
+def _bounds(first, last):
+    """Half-open string bounds for ISO timestamps: [first 00:00, day after last)."""
+    return _day(first), _day(last + timedelta(days=1))
+
+
+def _delta(current, previous):
+    """Percent change, or None when there is nothing to compare with (never a division by zero)."""
+    if not previous:
+        return None
+    return round(100 * (current - previous) / previous, 1)
+
+
+def _paid_orders_stage(lo, hi):
+    """Paid orders dated by paid_at (created_at for older orders) inside [lo, hi)."""
+    return [
+        {"$match": {"status": "paid"}},
+        {"$addFields": {"paid_time": {"$ifNull": ["$paid_at", "$created_at"]}}},
+        {"$match": {"paid_time": {"$gte": lo, "$lt": hi}}},
+    ]
+
+
+def _revenue(lo, hi):
+    rows = list(col("orders").aggregate(_paid_orders_stage(lo, hi) + [
+        {"$group": {"_id": None, "amount": {"$sum": "$amount"}, "orders": {"$sum": 1}}},
+    ]))
+    return (rows[0]["amount"], rows[0]["orders"]) if rows else (0, 0)
+
+
+def _attempts_per_parent(lo, hi, tail=()):
+    """Attempts in [lo, hi) summed per parent: group by child first, then join the child's parent."""
+    return col("practice_history").aggregate([
+        {"$match": {"created_at": {"$gte": lo, "$lt": hi}}},
+        {"$group": {"_id": "$child_id", "attempts": {"$sum": 1}}},
+        {"$lookup": {"from": "children", "localField": "_id", "foreignField": "_id", "as": "child"}},
+        {"$unwind": "$child"},
+        {"$match": {"child.parent_id": {"$ne": None}}},
+        {"$group": {"_id": "$child.parent_id", "attempts": {"$sum": "$attempts"}, "children": {"$sum": 1}}},
+        *tail,
+    ])
+
+
+def _count(rows):
+    return len(list(rows))
+
+
+def _mask_email(email):
+    name, _, domain = str(email or "").partition("@")
+    return f"{name[:1]}***@{domain}" if domain else "***"
+
+
+def _buyers_by_plan(lo, hi):
+    """Per plan id: distinct paying accounts and paid orders, overall and inside the range."""
+    result = []
+    for plan in commerce.list_plans(active_only=False):
+        if not plan["monthly"]:
+            continue
+        rows = list(col("orders").aggregate([
+            {"$match": {"status": "paid", "plan": {"$regex": f"^Gói {plan['name']} "}}},
+            {"$addFields": {"in_range": {"$cond": [{"$and": [
+                {"$gte": [{"$ifNull": ["$paid_at", "$created_at"]}, lo]},
+                {"$lt": [{"$ifNull": ["$paid_at", "$created_at"]}, hi]}]}, 1, 0]}}},
+            {"$group": {"_id": "$account_id", "orders": {"$sum": 1}, "range_orders": {"$sum": "$in_range"}}},
+            {"$group": {"_id": None, "buyers": {"$sum": 1}, "orders": {"$sum": "$orders"}, "range_orders": {"$sum": "$range_orders"},
+                        "range_buyers": {"$sum": {"$cond": [{"$gt": ["$range_orders", 0]}, 1, 0]}}}},
+        ]))
+        r = rows[0] if rows else {}
+        result.append({
+            "id": plan["id"], "name": plan["name"], "monthly": plan["monthly"],
+            "buyers": r.get("buyers", 0), "orders": r.get("orders", 0),
+            "rangeBuyers": r.get("range_buyers", 0), "rangeOrders": r.get("range_orders", 0),
+        })
+    return result
+
+
+def _funnel(lo, hi):
+    """Parents registered in the range -> with a child profile -> a child that practised -> on a paid plan."""
+    cohort = col("accounts").distinct("_id", {"role": "parent", "created_at": {"$gte": lo, "$lt": hi}})
+    with_child = col("children").distinct("parent_id", {"parent_id": {"$in": cohort}}) if cohort else []
+    child_ids = col("children").distinct("_id", {"parent_id": {"$in": with_child}}) if with_child else []
+    practised = col("practice_history").distinct("child_id", {"child_id": {"$in": child_ids}}) if child_ids else []
+    with_attempt = col("children").distinct("parent_id", {"_id": {"$in": practised}}) if practised else []
+    paid = col("accounts").count_documents({"_id": {"$in": cohort}, "plan": {"$ne": "free"}}) if cohort else 0
+    counts = [("Phụ huynh đăng ký", len(cohort)), ("Đã tạo hồ sơ bé", len(with_child)),
+              ("Bé đã luyện phát âm", len(with_attempt)), ("Dùng gói trả phí", paid)]
+    steps = []
+    for i, (label, count) in enumerate(counts):
+        before = counts[i - 1][1] if i else count
+        steps.append({"label": label, "count": count, "ofPrevious": round(100 * count / before, 1) if before else None})
+    return steps
+
+
+@router.get("/dashboard")
+def dashboard(range_name: str = Query("7d", alias="range")):
+    """Analytics for the overview screen; every number is aggregated from the database for the chosen range."""
+    if range_name not in RANGES:
+        raise ValidationError("Khoảng thời gian không hợp lệ.")
+    commerce.expire_subscriptions()
+    now = utc_now()
+    first, last, length = _window(range_name, now)
+    lo, hi = _bounds(first, last)
+    prev_first, prev_last = first - timedelta(days=length), first - timedelta(days=1)
+    plo, phi = _bounds(prev_first, prev_last)
+
+    active = _count(_attempts_per_parent(lo, hi))
+    active_prev = _count(_attempts_per_parent(plo, phi))
+    attempts = col("practice_history").count_documents({"created_at": {"$gte": lo, "$lt": hi}})
+    attempts_prev = col("practice_history").count_documents({"created_at": {"$gte": plo, "$lt": phi}})
+    new_parents = col("accounts").count_documents({"role": "parent", "created_at": {"$gte": lo, "$lt": hi}})
+    new_parents_prev = col("accounts").count_documents({"role": "parent", "created_at": {"$gte": plo, "$lt": phi}})
+    revenue, paid_orders = _revenue(lo, hi)
+    revenue_prev, _ = _revenue(plo, phi)
+    parents = col("accounts").count_documents({"role": "parent"})
+    paid_parents = col("accounts").count_documents({"role": "parent", "plan": {"$ne": "free"}})
+
+    # The chart covers the range; "today" shows the 6 days before it as context (one day alone is no chart).
+    chart_first = first - timedelta(days=6) if range_name == "today" else first
+    clo, _ = _bounds(chart_first, last)
+    new_by_day = _per_day("accounts", {"role": "parent", "created_at": {"$gte": clo, "$lt": hi}}, 1)
+    attempts_by_day = _per_day("practice_history", {"created_at": {"$gte": clo, "$lt": hi}}, 1)
+    revenue_by_day = {r["_id"]: r["amount"] for r in col("orders").aggregate(_paid_orders_stage(clo, hi) + [
+        {"$group": {"_id": {"$substr": ["$paid_time", 0, 10]}, "amount": {"$sum": "$amount"}}}])}
+    days = [_day(chart_first + timedelta(days=i)) for i in range((last - chart_first).days + 1)]
+
+    by_plan = [
+        {"plan": r["_id"], "orders": r["orders"], "buyers": len(r["buyers"]), "amount": r["amount"]}
+        for r in col("orders").aggregate(_paid_orders_stage(lo, hi) + [
+            {"$group": {"_id": "$plan", "orders": {"$sum": 1}, "amount": {"$sum": "$amount"}, "buyers": {"$addToSet": "$account_id"}}},
+            {"$sort": {"amount": -1}},
+        ])
+    ]
+    recent = [
+        {"customer": r["customer"], "email": _mask_email(r.get("email")), "plan": r["plan"], "amount": r["amount"], "paid_at": r["paid_time"]}
+        for r in col("orders").aggregate([
+            {"$match": {"status": "paid"}},
+            {"$addFields": {"paid_time": {"$ifNull": ["$paid_at", "$created_at"]}}},
+            {"$sort": {"paid_time": -1}}, {"$limit": RECENT_BUYERS},
+        ])
+    ]
+    top_rows = list(_attempts_per_parent(lo, hi, tail=[{"$sort": {"attempts": -1, "_id": 1}}, {"$limit": TOP_FAMILIES}]))
+    owners = {a["_id"]: a for a in col("accounts").find({"_id": {"$in": [r["_id"] for r in top_rows]}}, {"name": 1, "plan": 1})}
+    all_children = {r["_id"]: r["n"] for r in col("children").aggregate([
+        {"$match": {"parent_id": {"$in": list(owners)}}}, {"$group": {"_id": "$parent_id", "n": {"$sum": 1}}}])}
+    plan_names = {p["id"]: p["name"] for p in commerce.list_plans(active_only=False)}
+    top = [
+        {"name": owners[r["_id"]]["name"], "children": all_children.get(r["_id"], 0), "attempts": r["attempts"],
+         "plan": plan_names.get(owners[r["_id"]].get("plan"), owners[r["_id"]].get("plan", ""))}
+        for r in top_rows if r["_id"] in owners
+    ]
+    return {
+        "range": range_name, "generatedAt": now_iso(), "from": _day(first), "to": _day(last),
+        "kpis": {
+            "activeFamilies": {"value": active, "previous": active_prev, "delta": _delta(active, active_prev)},
+            "newParents": {"value": new_parents, "previous": new_parents_prev, "delta": _delta(new_parents, new_parents_prev)},
+            "totalParents": parents,
+            "attempts": {"value": attempts, "previous": attempts_prev, "delta": _delta(attempts, attempts_prev)},
+            "revenue": {"value": revenue, "previous": revenue_prev, "delta": _delta(revenue, revenue_prev),
+                        "paidOrders": paid_orders, "average": round(revenue / paid_orders) if paid_orders else 0},
+            "conversion": {"paidParents": paid_parents, "parents": parents, "percent": round(100 * paid_parents / parents, 1) if parents else 0},
+        },
+        "daily": [{"day": d, "newParents": new_by_day.get(d, 0), "attempts": attempts_by_day.get(d, 0), "revenue": revenue_by_day.get(d, 0)} for d in days],
+        "revenueByPlan": by_plan,
+        "buyersByPlan": _buyers_by_plan(lo, hi),
+        "recentBuyers": recent,
+        "funnel": _funnel(lo, hi),
+        "topFamilies": top,
     }
 
 
