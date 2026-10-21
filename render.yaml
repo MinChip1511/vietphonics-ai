@@ -27,5 +27,17 @@ services:
         sync: false   # the Gmail address that sends the codes
       - key: SMTP_PASSWORD
         sync: false   # a Google "app password" (16 characters), not the account password
+      - key: MOMO_PARTNER_CODE
+        sync: false   # MoMo payments (optional): from the MoMo business portal / sandbox docs
+      - key: MOMO_ACCESS_KEY
+        sync: false
+      - key: MOMO_SECRET_KEY
+        sync: false
+      - key: MOMO_ENDPOINT
+        value: https://test-payment.momo.vn   # sandbox; use https://payment.momo.vn for real money
+      - key: PUBLIC_API_URL
+        sync: false   # this API's public address, e.g. https://vietphonics-ai.onrender.com (MoMo calls /api/payments/momo/ipn)
+      - key: PUBLIC_WEB_URL
+        sync: false   # the website, e.g. https://vietphonics-ai.vercel.app (where the customer returns after paying)
       - key: VIETPHONICS_CORS
         value: ""     # only needed if the browser calls this API directly; the Vercel /api rewrite does not

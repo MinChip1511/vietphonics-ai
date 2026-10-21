@@ -1,11 +1,11 @@
 """Public content (lessons, plans, coupons) and the parent's own orders."""
 from typing import Optional
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from fastapi.responses import Response
 from pydantic import BaseModel
 
-from .. import catalog, commerce
+from .. import catalog, commerce, config, payments
 from ..security import current_account
 
 router = APIRouter(prefix="/api", tags=["content"])
@@ -71,3 +71,42 @@ def uploaded_file(file_id: str):
         raise HTTPException(status_code=404, detail="Không tìm thấy tệp")
     content_type, data = found
     return Response(data, media_type=content_type, headers={"Cache-Control": "public, max-age=31536000, immutable"})
+
+
+@router.get("/orders/{order_id}")
+def my_order(order_id: str, account: dict = Depends(current_account)):
+    order = commerce.get_order(order_id)
+    if not order or order["account_id"] != account["id"]:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng.")
+    return order
+
+
+@router.get("/payments/config")
+def payment_config():
+    """Which ways of paying this server offers (the checkout screen adapts to it)."""
+    return {"momo": commerce.momo_enabled(), "demo": not config.PRODUCTION}
+
+
+@router.post("/orders/{order_id}/pay")
+def pay_order(order_id: str, account: dict = Depends(current_account)):
+    order = commerce.get_order(order_id)
+    if not order or order["account_id"] != account["id"]:
+        raise HTTPException(status_code=404, detail="Không tìm thấy đơn hàng.")
+    try:
+        return payments.start_momo_payment(order)
+    except payments.PaymentError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.message)
+
+
+@router.post("/payments/momo/ipn", status_code=204)
+async def momo_ipn(request: Request):
+    """MoMo's payment notification (public; the HMAC signature is the authentication)."""
+    try:
+        data = await request.json()
+    except ValueError:
+        raise HTTPException(status_code=400, detail="invalid")
+    try:
+        payments.handle_momo_ipn(data)
+    except payments.PaymentError as exc:
+        raise HTTPException(status_code=exc.status, detail=exc.message)
+    return Response(status_code=204)

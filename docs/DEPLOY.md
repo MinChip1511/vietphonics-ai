@@ -71,3 +71,10 @@ TEST_MONGODB_URI=<uri> backend/venv/bin/python scripts/test_api.py   # cùng b�
 node scripts/smoke_ui.js        # mở mọi màn hình (cần chạy backend + frontend)
 docker build -f backend/Dockerfile -t vietphonics-api .   # thử build image (cần Docker Desktop đang chạy)
 ```
+
+
+## 2c. Thanh toán MoMo (QR, tự động xác nhận)
+1. Lấy thông tin sandbox của MoMo (tài liệu developers.momo.vn hoặc cổng MoMo for Business): `partnerCode`, `accessKey`, `secretKey`.
+2. Trên Render → **Environment** thêm: `MOMO_PARTNER_CODE`, `MOMO_ACCESS_KEY`, `MOMO_SECRET_KEY`, `PUBLIC_API_URL` (địa chỉ Render, ví dụ `https://vietphonics-ai.onrender.com`), `PUBLIC_WEB_URL` (địa chỉ Vercel). `MOMO_ENDPOINT` mặc định là sandbox (`https://test-payment.momo.vn`).
+3. MoMo gọi lại `PUBLIC_API_URL/api/payments/momo/ipn` khi khách thanh toán xong; đơn tự chuyển sang "paid" và gói được nâng cấp. Khi chưa cấu hình MoMo, bản production không cho thanh toán (không còn nút giả lập).
+4. Chuyển sang tiền thật: đổi `MOMO_ENDPOINT` thành `https://payment.momo.vn` và dùng khóa chính thức.

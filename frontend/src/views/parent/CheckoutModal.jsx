@@ -1,13 +1,15 @@
-import React, { useMemo, useState } from "react";
-import { CheckCircle2 } from "lucide-react";
+import React, { useEffect, useMemo, useState } from "react";
+import { CheckCircle2, ExternalLink } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
 import { Modal, Button, inputClass } from "../../components/ui";
 import { api } from "../../services/apiClient";
 import { formatVnd } from "../../data/adminLabels";
 import { qrCells } from "../../data/coupons";
 
-const METHODS = ["QR ngân hàng", "MoMo", "VNPay"];
+const DEMO_METHODS = ["QR ngân hàng", "MoMo", "VNPay"];
+const POLL_MS = 3000;
 
-// Placeholder pattern, not a payable QR: no payment gateway is connected yet (sandbox).
+// Placeholder pattern, not a payable QR: used only by the simulated payment (development).
 function FakeQr({ seed }) {
   const cells = useMemo(() => qrCells(seed), [seed]);
   return (
@@ -23,10 +25,40 @@ export default function CheckoutModal({ plan, billing, onClose, onPaid }) {
   const [code, setCode] = useState("");
   const [quote, setQuote] = useState(null); // {base, price, coupon}
   const [error, setError] = useState(null);
-  const [method, setMethod] = useState(METHODS[0]);
+  const [methods, setMethods] = useState(null); // what the server offers; null while loading
+  const [demo, setDemo] = useState(false);
+  const [method, setMethod] = useState("");
+  const [momo, setMomo] = useState(null); // {qrCode, payUrl} of a live MoMo payment
   const [step, setStep] = useState("review"); // review | pay | done
   const [order, setOrder] = useState(null);
   const [busy, setBusy] = useState(false);
+  const isMomo = method === "MoMo" && momo;
+
+  useEffect(() => {
+    let alive = true;
+    api("/payments/config").then((cfg) => {
+      if (!alive) return;
+      const list = cfg.momo ? ["MoMo", ...(cfg.demo ? DEMO_METHODS.filter((m) => m !== "MoMo") : [])] : cfg.demo ? DEMO_METHODS : [];
+      setMethods(list);
+      setDemo(cfg.demo);
+      setMethod(list[0] || "");
+    }).catch(() => alive && setMethods([]));
+    return () => { alive = false; };
+  }, []);
+
+  // A live MoMo payment confirms itself: poll the order until the server (MoMo's callback) marks it paid.
+  useEffect(() => {
+    if (step !== "pay" || !isMomo || !order) return undefined;
+    const timer = setInterval(async () => {
+      try {
+        const fresh = await api(`/orders/${order.id}`);
+        if (fresh.status === "paid") { setOrder(fresh); setStep("done"); onPaid(); }
+        else if (fresh.status === "failed") { setError("Thanh toán không thành công. Bạn có thể thử lại."); setStep("review"); setMomo(null); }
+      } catch { /* a network blip: the next tick retries */ }
+    }, POLL_MS);
+    return () => clearInterval(timer);
+  }, [step, isMomo, order, onPaid]);
+
   if (!plan) return null;
 
   const base = period === "yearly" ? plan.yearlyPrice : plan.monthlyPrice;
@@ -49,7 +81,9 @@ export default function CheckoutModal({ plan, billing, onClose, onPaid }) {
     setBusy(true);
     setError(null);
     try {
-      setOrder(await api("/orders", { method: "POST", body: { plan_id: plan.id, period, coupon: quote?.coupon ? code.trim() : null, method } }));
+      const created = await api("/orders", { method: "POST", body: { plan_id: plan.id, period, coupon: quote?.coupon ? code.trim() : null, method } });
+      if (method === "MoMo" && !created.method.includes("mô phỏng")) setMomo(await api(`/orders/${created.id}/pay`, { method: "POST" }));
+      setOrder(created);
       setStep("pay");
     } catch (err) {
       setError(err.message);
@@ -85,22 +119,41 @@ export default function CheckoutModal({ plan, billing, onClose, onPaid }) {
             <input data-testid="coupon-input" className={inputClass} value={code} onChange={(e) => check(e.target.value)} placeholder="VD: PHUTRAI20" />
             {error && <span className="text-xs text-red-500">{error}</span>}
           </label>
+          {methods && methods.length === 0 && <p className="rounded-xl bg-amber-50 px-3 py-2 text-sm text-amber-700">Thanh toán trực tuyến hiện chưa khả dụng. Vui lòng liên hệ hotline để được hỗ trợ.</p>}
           <div className="flex flex-col gap-1.5">
             <span className="text-sm font-semibold text-vp-ink">Phương thức thanh toán</span>
             <div className="flex flex-wrap gap-2">
-              {METHODS.map((m) => (
+              {(methods || []).map((m) => (
                 <button key={m} onClick={() => setMethod(m)} className={`rounded-full border px-4 py-2 text-sm font-semibold ${method === m ? "border-vp-blue bg-vp-sky text-vp-blue" : "border-vp-border text-vp-ink"}`}>{m}</button>
               ))}
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-2">
             <Button variant="ghost" onClick={onClose}>Hủy</Button>
-            <Button data-testid="checkout-next" onClick={createOrder} disabled={busy}>Tạo đơn hàng</Button>
+            <Button data-testid="checkout-next" onClick={createOrder} disabled={busy || !method}>Tạo đơn hàng</Button>
           </div>
         </div>
       )}
 
-      {step === "pay" && order && (
+      {step === "pay" && order && isMomo && (
+        <div className="flex flex-col items-center gap-4 text-center" data-testid="momo-pay">
+          <p className="text-sm text-vp-muted">Mở ứng dụng MoMo và quét mã để thanh toán đơn <b className="text-vp-ink">{order.id}</b></p>
+          <div className="rounded-2xl border border-vp-border bg-white p-3">
+            <QRCodeSVG value={momo.qrCode || momo.payUrl} size={192} marginSize={1} aria-label="Mã QR thanh toán MoMo" data-testid="momo-qr" />
+          </div>
+          <p className="font-heading text-2xl font-extrabold text-vp-blue">{formatVnd(order.amount)}</p>
+          {momo.payUrl && (
+            <a href={momo.payUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 text-sm font-semibold text-vp-blue underline">
+              Thanh toán trên trang MoMo <ExternalLink className="w-4 h-4" />
+            </a>
+          )}
+          <p className="text-xs text-vp-muted">Đang chờ thanh toán... Trang sẽ tự cập nhật khi MoMo xác nhận.</p>
+          {error && <p className="text-xs text-red-500">{error}</p>}
+          <Button variant="ghost" onClick={() => { setStep("review"); setMomo(null); }}>Quay lại</Button>
+        </div>
+      )}
+
+      {step === "pay" && order && !isMomo && (
         <div className="flex flex-col items-center gap-4 text-center">
           <p className="text-sm text-vp-muted">Quét mã bằng ứng dụng {method} để thanh toán đơn <b className="text-vp-ink">{order.id}</b></p>
           <FakeQr seed={order.id + method} />
@@ -109,7 +162,7 @@ export default function CheckoutModal({ plan, billing, onClose, onPaid }) {
           {error && <p className="text-xs text-red-500">{error}</p>}
           <div className="flex gap-2">
             <Button variant="ghost" onClick={() => setStep("review")} disabled={busy}>Quay lại</Button>
-            <Button data-testid="checkout-paid" onClick={confirmPaid} disabled={busy}>Tôi đã thanh toán</Button>
+            {demo && <Button data-testid="checkout-paid" onClick={confirmPaid} disabled={busy}>Tôi đã thanh toán</Button>}
           </div>
         </div>
       )}

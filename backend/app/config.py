@@ -44,6 +44,18 @@ SMTP_USER = _env("SMTP_USER")
 SMTP_PASSWORD = _env("SMTP_PASSWORD")
 BREVO_API_KEY = _env("BREVO_API_KEY")
 
+# MoMo payments (QR + automatic confirmation). Sandbox credentials come from MoMo's developer docs / business
+# portal; leave them empty to keep payments off (production) or simulated (development).
+#   MOMO_PARTNER_CODE, MOMO_ACCESS_KEY, MOMO_SECRET_KEY    MOMO_ENDPOINT defaults to the sandbox
+#   PUBLIC_API_URL  the public address of this API (MoMo calls /api/payments/momo/ipn on it)
+#   PUBLIC_WEB_URL  where the customer lands after paying (the Vercel site)
+MOMO_PARTNER_CODE = _env("MOMO_PARTNER_CODE")
+MOMO_ACCESS_KEY = _env("MOMO_ACCESS_KEY")
+MOMO_SECRET_KEY = _env("MOMO_SECRET_KEY")
+MOMO_ENDPOINT = _env("MOMO_ENDPOINT", "https://test-payment.momo.vn").rstrip("/")
+PUBLIC_API_URL = (_env("PUBLIC_API_URL") or "").rstrip("/")
+PUBLIC_WEB_URL = (_env("PUBLIC_WEB_URL") or "").rstrip("/")
+
 # Browsers on another origin than the API (e.g. Vercel calling Render directly) must be listed here.
 # With the Vercel "/api" rewrite (frontend/vercel.json) the browser stays same-origin and none is needed.
 CORS_ORIGINS = [o.strip() for o in (_env("VIETPHONICS_CORS", "" if PRODUCTION else "*")).split(",") if o.strip()]

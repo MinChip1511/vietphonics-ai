@@ -8,6 +8,7 @@ from datetime import date
 
 from pymongo import ReturnDocument
 
+from . import config
 from .database import clean, clean_all, col, now_iso
 
 ORDER_STATUSES = ("paid", "pending", "failed", "expired", "refunded")
@@ -169,6 +170,10 @@ def get_order(order_id):
 PAYMENT_METHODS = ("QR ngân hàng", "MoMo", "VNPay")
 
 
+def momo_enabled():
+    return bool(config.MOMO_PARTNER_CODE and config.MOMO_ACCESS_KEY and config.MOMO_SECRET_KEY and config.PUBLIC_API_URL)
+
+
 def create_order(account, plan_id, period, coupon_code=None, method="QR ngân hàng"):
     plan, _, final, coupon = price_for(plan_id, period, coupon_code)
     if method not in PAYMENT_METHODS:
@@ -178,21 +183,34 @@ def create_order(account, plan_id, period, coupon_code=None, method="QR ngân h�
         "_id": order_id, "account_id": account["id"], "customer": account["name"], "email": account["email"],
         "phone": account["phone"],
         "plan": f"Gói {plan['name']} {PERIOD_LABEL[period]}" + (f" (mã {coupon['id']})" if coupon else ""),
-        "amount": final, "method": f"{method} (mô phỏng)", "status": "pending", "created_at": now_iso(),
+        "amount": final, "method": method if (method == "MoMo" and momo_enabled()) else f"{method} (mô phỏng)",
+        "status": "pending", "created_at": now_iso(),
     })
     return get_order(order_id)
 
 
+def mark_paid(order_id, extra=None):
+    """pending -> paid exactly once (atomic), then upgrade the account's plan. Returns the order, or None when
+    it was not pending (already paid, failed...), so a repeated gateway notification changes nothing."""
+    paid = col("orders").find_one_and_update(
+        {"_id": order_id, "status": "pending"}, {"$set": {"status": "paid", "paid_at": now_iso(), **(extra or {})}}
+    )
+    if not paid:
+        return None
+    plan_name = re.match(r"Gói (\w+)", paid["plan"]).group(1).lower()
+    col("accounts").update_one({"_id": paid["account_id"]}, {"$set": {"plan": plan_name}})
+    return get_order(order_id)
+
+
 def confirm_demo_payment(order_id, account):
-    """Simulated payment confirmation: marks the caller's own pending order paid and upgrades the plan."""
+    """Simulated payment confirmation (development only): marks the caller's own pending order paid."""
+    if config.PRODUCTION:
+        raise CommerceError("Không tìm thấy đơn hàng.", 404)  # in production only the payment gateway can confirm
     order = get_order(order_id)
     if not order or order["account_id"] != account["id"]:
         raise CommerceError("Không tìm thấy đơn hàng.", 404)
-    paid = col("orders").find_one_and_update({"_id": order_id, "status": "pending"}, {"$set": {"status": "paid"}})
-    if not paid:
+    if not mark_paid(order_id):
         raise CommerceError("Đơn hàng này không còn ở trạng thái chờ thanh toán.", 409)
-    plan_name = re.match(r"Gói (\w+)", order["plan"]).group(1).lower()
-    col("accounts").update_one({"_id": account["id"]}, {"$set": {"plan": plan_name}})
     return get_order(order_id)
 
 
