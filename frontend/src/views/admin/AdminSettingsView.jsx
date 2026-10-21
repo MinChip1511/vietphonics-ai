@@ -71,8 +71,8 @@ export default function AdminSettingsView() {
               ))}
             </div>
             <div className="border-t border-[#E2E8F0] pt-3">
-              <p className="text-[13px] font-semibold text-[#0F172A]">Cổng thanh toán tích hợp</p>
-              <p className="text-xs text-[#6B7280]">Môi trường: <b className="text-emerald-600">{settings.paymentEnv}</b></p>
+              <p className="text-[13px] font-semibold text-[#0F172A]">Hình thức thanh toán</p>
+              <p className="text-xs text-[#6B7280]">Chuyển khoản QR VNPay/MoMo, <b className="text-emerald-600">xác nhận thủ công</b> ở mục Đơn hàng</p>
             </div>
           </Card>
           <Card flat className="p-6 flex flex-col gap-3" data-testid="email-test">
