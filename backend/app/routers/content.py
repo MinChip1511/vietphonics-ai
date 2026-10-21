@@ -84,7 +84,7 @@ def my_order(order_id: str, account: dict = Depends(current_account)):
 @router.get("/payments/config")
 def payment_config():
     """Which ways of paying this server offers (the checkout screen adapts to it)."""
-    return {"momo": commerce.momo_enabled(), "demo": not config.PRODUCTION}
+    return {"momo": commerce.momo_enabled(), "demo": not config.PRODUCTION, "manual": list(commerce.MANUAL_METHODS)}
 
 
 @router.post("/orders/{order_id}/pay")

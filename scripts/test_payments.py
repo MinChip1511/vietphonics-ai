@@ -147,7 +147,21 @@ def the_demo_confirmation_is_closed_in_production():
 
 @case
 def payment_config_reports_what_is_available():
-    assert client.get("/api/payments/config").json() == {"momo": True, "demo": True}
+    cfg = client.get("/api/payments/config").json()
+    assert cfg["momo"] is True and cfg["demo"] is True and cfg["manual"] == ["Chuyển khoản VNPay", "Chuyển khoản MoMo"], cfg
+
+
+@case
+def a_manual_transfer_order_is_real_and_the_admin_confirmation_upgrades_the_plan():
+    h = login()
+    order = new_order(h, method="Chuyển khoản MoMo")
+    assert order["method"] == "Chuyển khoản MoMo" and order["status"] == "pending"
+    assert client.post(f"/api/orders/{order['id']}/pay", headers=h).status_code == 400  # no gateway involved
+    admin = client.post("/api/auth/login", json={"email": "admin@vietphonics.vn", "password": "admin123"}).json()["token"]
+    ah = {"Authorization": f"Bearer {admin}"}
+    assert client.patch(f"/api/admin/orders/{order['id']}", headers=ah, json={"status": "paid"}).json()["status"] == "paid"
+    assert col("accounts").find_one({"email": "phuhuynh@vietphonics.vn"})["plan"] == "premium"
+    assert client.get(f"/api/orders/{order['id']}", headers=h).json()["status"] == "paid"
 
 
 if __name__ == "__main__":

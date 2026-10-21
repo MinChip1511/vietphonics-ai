@@ -8,6 +8,11 @@ import { qrCells } from "../../data/coupons";
 
 const DEMO_METHODS = ["QR ngân hàng", "MoMo", "VNPay"];
 const POLL_MS = 3000;
+// The shop's own receiving QR codes (public/pay): the customer scans, transfers, and an admin confirms the money arrived.
+const MANUAL_QR = {
+  "Chuyển khoản VNPay": { image: "/pay/vnpay-qr.jpeg", app: "VNPay" },
+  "Chuyển khoản MoMo": { image: "/pay/momo-qr.jpeg", app: "MoMo" }
+};
 
 // Placeholder pattern, not a payable QR: used only by the simulated payment (development).
 function FakeQr({ seed }) {
@@ -33,12 +38,14 @@ export default function CheckoutModal({ plan, billing, onClose, onPaid }) {
   const [order, setOrder] = useState(null);
   const [busy, setBusy] = useState(false);
   const isMomo = method === "MoMo" && momo;
+  const manualQr = MANUAL_QR[method];
 
   useEffect(() => {
     let alive = true;
     api("/payments/config").then((cfg) => {
       if (!alive) return;
-      const list = cfg.momo ? ["MoMo", ...(cfg.demo ? DEMO_METHODS.filter((m) => m !== "MoMo") : [])] : cfg.demo ? DEMO_METHODS : [];
+      const manual = (cfg.manual || []).filter((m) => MANUAL_QR[m]);
+      const list = [...(cfg.momo ? ["MoMo"] : []), ...manual, ...(cfg.demo ? DEMO_METHODS.filter((m) => !(m === "MoMo" && cfg.momo)) : [])];
       setMethods(list);
       setDemo(cfg.demo);
       setMethod(list[0] || "");
@@ -105,7 +112,7 @@ export default function CheckoutModal({ plan, billing, onClose, onPaid }) {
   };
 
   return (
-    <Modal open onClose={onClose} title={step === "done" ? "Thanh toán thành công" : `Nâng cấp ${label}`}>
+    <Modal open onClose={onClose} title={step === "done" ? "Thanh toán thành công" : step === "waiting" ? "Đang chờ xác nhận" : `Nâng cấp ${label}`}>
       {step === "review" && (
         <div className="flex flex-col gap-4">
           <div className="rounded-2xl bg-vp-canvas p-4 flex flex-col gap-2 text-sm">
@@ -135,6 +142,31 @@ export default function CheckoutModal({ plan, billing, onClose, onPaid }) {
         </div>
       )}
 
+      {step === "pay" && order && manualQr && (
+        <div className="flex flex-col items-center gap-3 text-center" data-testid="manual-pay">
+          <p className="text-sm text-vp-muted">Mở ứng dụng {manualQr.app} hoặc ngân hàng, quét mã dưới đây và chuyển đúng số tiền.</p>
+          <img src={manualQr.image} alt={`Mã QR nhận tiền ${manualQr.app}`} className="w-60 rounded-2xl border border-vp-border" data-testid="manual-qr" />
+          <p className="font-heading text-2xl font-extrabold text-vp-blue">{formatVnd(order.amount)}</p>
+          <div className="w-full rounded-2xl bg-vp-canvas p-3 text-left text-sm text-vp-ink">
+            <p>Nội dung chuyển khoản: <b data-testid="manual-note">{order.id}</b></p>
+            <p className="text-xs text-vp-muted mt-1">Vui lòng ghi đúng nội dung này để chúng tôi nhận ra khoản chuyển của bạn.</p>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="ghost" onClick={() => setStep("review")}>Quay lại</Button>
+            <Button data-testid="manual-sent" onClick={() => { setStep("waiting"); onPaid(); }}>Tôi đã chuyển khoản</Button>
+          </div>
+        </div>
+      )}
+
+      {step === "waiting" && (
+        <div className="flex flex-col items-center gap-3 text-center" data-testid="manual-waiting">
+          <CheckCircle2 className="w-16 h-16 text-vp-blue" />
+          <p className="font-bold text-vp-ink">Đã ghi nhận đơn {order?.id}.</p>
+          <p className="text-sm text-vp-muted">Gói {label} sẽ được kích hoạt sau khi chúng tôi xác nhận đã nhận được tiền. Bạn có thể theo dõi trạng thái ở mục lịch sử đơn hàng.</p>
+          <Button onClick={onClose}>Đóng</Button>
+        </div>
+      )}
+
       {step === "pay" && order && isMomo && (
         <div className="flex flex-col items-center gap-4 text-center" data-testid="momo-pay">
           <p className="text-sm text-vp-muted">Mở ứng dụng MoMo và quét mã để thanh toán đơn <b className="text-vp-ink">{order.id}</b></p>
@@ -153,7 +185,7 @@ export default function CheckoutModal({ plan, billing, onClose, onPaid }) {
         </div>
       )}
 
-      {step === "pay" && order && !isMomo && (
+      {step === "pay" && order && !isMomo && !manualQr && (
         <div className="flex flex-col items-center gap-4 text-center">
           <p className="text-sm text-vp-muted">Quét mã bằng ứng dụng {method} để thanh toán đơn <b className="text-vp-ink">{order.id}</b></p>
           <FakeQr seed={order.id + method} />

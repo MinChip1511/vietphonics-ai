@@ -167,7 +167,9 @@ def get_order(order_id):
     return clean(col("orders").find_one({"_id": order_id}))
 
 
-PAYMENT_METHODS = ("QR ngân hàng", "MoMo", "VNPay")
+# MANUAL_METHODS: the customer scans the shop's own QR and transfers the money; an admin confirms it by hand.
+MANUAL_METHODS = ("Chuyển khoản VNPay", "Chuyển khoản MoMo")
+PAYMENT_METHODS = ("QR ngân hàng", "MoMo", "VNPay") + MANUAL_METHODS
 
 
 def momo_enabled():
@@ -183,7 +185,7 @@ def create_order(account, plan_id, period, coupon_code=None, method="QR ngân h�
         "_id": order_id, "account_id": account["id"], "customer": account["name"], "email": account["email"],
         "phone": account["phone"],
         "plan": f"Gói {plan['name']} {PERIOD_LABEL[period]}" + (f" (mã {coupon['id']})" if coupon else ""),
-        "amount": final, "method": method if (method == "MoMo" and momo_enabled()) else f"{method} (mô phỏng)",
+        "amount": final, "method": method if (method in MANUAL_METHODS or (method == "MoMo" and momo_enabled())) else f"{method} (mô phỏng)",
         "status": "pending", "created_at": now_iso(),
     })
     return get_order(order_id)
@@ -217,7 +219,13 @@ def confirm_demo_payment(order_id, account):
 def set_order_status(order_id, status):
     if status not in ORDER_STATUSES:
         raise CommerceError("Trạng thái đơn hàng không hợp lệ.")
-    if not get_order(order_id):
+    order = get_order(order_id)
+    if not order:
         raise CommerceError("Không tìm thấy đơn hàng.", 404)
+    if status == "paid" and order["status"] != "paid":
+        # Confirming a payment by hand must also give the customer what they bought.
+        col("orders").update_one({"_id": order_id}, {"$set": {"status": "pending"}})
+        mark_paid(order_id, {"confirmed_by_admin": True})
+        return get_order(order_id)
     col("orders").update_one({"_id": order_id}, {"$set": {"status": status}})
     return get_order(order_id)
