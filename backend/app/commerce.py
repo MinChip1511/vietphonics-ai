@@ -1,7 +1,8 @@
 """Plans, coupons and orders. Prices are computed here from the stored price list, never taken from the client.
 
-Payment is simulated for now (no payment gateway is connected): an order is created as "pending" and a
-demo confirmation marks it paid and upgrades the account.
+An order starts "pending" and becomes "paid" in exactly one place, `mark_paid`, which also upgrades the account and
+sets its end date. It is called by the MoMo notification (payments.py), by an admin who has seen the transfer
+arrive, and, in development only, by the demo confirmation.
 """
 import re
 from datetime import date, datetime, timedelta

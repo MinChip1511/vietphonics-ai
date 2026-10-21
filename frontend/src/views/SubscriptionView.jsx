@@ -92,9 +92,9 @@ export default function SubscriptionView({ onRequireLogin }) {
                   {plan.features.map((f) => <li key={f} className="flex gap-2"><Check className="w-4 h-4 mt-0.5 shrink-0 text-emerald-500" />{f}</li>)}
                 </ul>
                 <button
-                  disabled={plan.id === "free" || !user}
+                  disabled={plan.id === "free" || !user || (isCurrent && !endsAt)}
                   onClick={() => setCheckoutPlan(plan)}
-                  className={`h-11 rounded-full text-sm font-bold ${plan.id === "free" || !user ? "bg-vp-pill text-vp-muted cursor-not-allowed" : "bg-vp-blue text-white hover:brightness-110"}`}
+                  className={`h-11 rounded-full text-sm font-bold ${plan.id === "free" || !user || (isCurrent && !endsAt) ? "bg-vp-pill text-vp-muted cursor-not-allowed" : "bg-vp-blue text-white hover:brightness-110"}`}
                 >
                   {plan.id === "free" ? (isCurrent ? "Gói hiện tại" : "Gói miễn phí") : isCurrent ? (endsAt ? "Gia hạn thêm" : "Gói hiện tại") : plan.cta}
                 </button>
